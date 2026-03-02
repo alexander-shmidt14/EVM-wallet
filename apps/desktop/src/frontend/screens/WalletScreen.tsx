@@ -1,6 +1,8 @@
 ﻿import React, { useEffect, useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWalletStore } from '../store/wallet'
+import { EthIcon } from '../components/icons/EthIcon'
+import { MmaIcon } from '../components/icons/MmaIcon'
 
 export const WalletScreen: React.FC = () => {
   const navigate = useNavigate()
@@ -199,8 +201,8 @@ export const WalletScreen: React.FC = () => {
         {/* ETH Asset */}
         <div className="card flex items-center justify-between">
           <div className="flex items-center">
-            <div className="w-10 h-10 bg-dark-500 rounded-full flex items-center justify-center mr-4">
-              <span className="text-white font-bold text-sm">ETH</span>
+            <div className="mr-4">
+              <EthIcon size={40} />
             </div>
             <div>
               <p className="font-medium text-[#f2f2f2]">Ethereum</p>
@@ -218,8 +220,8 @@ export const WalletScreen: React.FC = () => {
         {/* MMA Token Asset */}
         <div className="card flex items-center justify-between mt-2">
           <div className="flex items-center">
-            <div className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center mr-4">
-              <span className="text-white font-bold text-xs">MMA</span>
+            <div className="mr-4">
+              <MmaIcon size={40} />
             </div>
             <div>
               {/* MMA Token */}
