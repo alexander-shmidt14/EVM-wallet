@@ -143,15 +143,16 @@ export const WalletScreen: React.FC = () => {
       <div className="card text-center mb-8 bg-dark-800 border-dark-600">
         <p className="text-sm text-gray-400 mb-2">Total Balance</p>
         <div className="flex items-center justify-center mb-2">
+          <p className="text-4xl font-bold text-[#f2f2f2]">≈ {'$'}{totalBalanceUsd || '0.00'} USD</p>
           {ethBalance ? (
-            <span className="text-4xl font-bold text-[#f2f2f2]">{ethBalance} ETH</span>
+            <span className="text-gray-500">{ethBalance} ETH</span>
           ) : isLoading ? (
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
           ) : (
             <span className="text-4xl font-bold text-[#f2f2f2]">0 ETH</span>
           )}
         </div>
-        <p className="text-gray-500">≈ {'$'}{totalBalanceUsd || '0.00'} USD</p>
+        
         
         <button 
           onClick={onRefresh}
