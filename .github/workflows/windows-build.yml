@@ -52,6 +52,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # ── Cache Electron binary ──────────────────────────────────────
+      - name: Cache Electron
+        uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/electron/Cache
+          key: electron-${{ runner.os }}-${{ hashFiles('apps/desktop/package.json') }}
+          restore-keys: electron-${{ runner.os }}-
+
       # ── Build shared packages ──────────────────────────────────────
       - name: Build wallet-core
         run: pnpm -F @wallet/wallet-core build
@@ -90,7 +98,21 @@ jobs:
       # ── Electron Builder: directory build ──────────────────────────
       - name: Electron Builder (--dir)
         working-directory: apps/desktop
-        run: npx electron-builder --dir --config electron-builder-nosign.json
+        shell: pwsh
+        run: |
+          $maxRetries = 3
+          for ($i = 1; $i -le $maxRetries; $i++) {
+            Write-Host "Attempt $i of $maxRetries..."
+            npx electron-builder --dir --config electron-builder-nosign.json
+            if ($LASTEXITCODE -eq 0) { break }
+            if ($i -lt $maxRetries) {
+              Write-Host "Failed, retrying in 15 seconds..."
+              Start-Sleep -Seconds 15
+            } else {
+              Write-Host "All $maxRetries attempts failed"
+              exit 1
+            }
+          }
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
@@ -98,7 +120,21 @@ jobs:
       - name: Create NSIS installer
         if: github.event.inputs.build-type != 'dir'
         working-directory: apps/desktop
-        run: npx electron-builder --win nsis --config electron-builder-nosign.json
+        shell: pwsh
+        run: |
+          $maxRetries = 3
+          for ($i = 1; $i -le $maxRetries; $i++) {
+            Write-Host "Attempt $i of $maxRetries..."
+            npx electron-builder --win nsis --config electron-builder-nosign.json
+            if ($LASTEXITCODE -eq 0) { break }
+            if ($i -lt $maxRetries) {
+              Write-Host "Failed, retrying in 15 seconds..."
+              Start-Sleep -Seconds 15
+            } else {
+              Write-Host "All $maxRetries attempts failed"
+              exit 1
+            }
+          }
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
