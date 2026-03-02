@@ -66,6 +66,11 @@ declare global {
 const MMA_TOKEN_ADDRESS = '0xcA82d24A97b33F2d5826575f77fdc8Bdb82FC580'
 const MMA_PRICE_USD = 55
 
+// Cache ETH price to avoid CoinGecko 429 rate-limit errors (free tier: ~10-30 req/min)
+let _cachedEthPrice: number = 0
+let _ethPriceFetchedAt: number = 0
+const ETH_PRICE_CACHE_MS = 60_000 // 60 seconds
+
 interface SavedWallet {
   id: string
   name: string
@@ -343,13 +348,19 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       const balance = await window.electronAPI.getEthBalance(currentAddress)
       set({ ethBalance: balance.formatted })
 
-      // Fetch ETH price
-      let ethPrice = 0
-      try {
-        const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd')
-        const data = await res.json()
-        ethPrice = data?.ethereum?.usd ?? 0
-      } catch { ethPrice = 0 }
+      // Fetch ETH price (with 60s cache to avoid CoinGecko 429)
+      let ethPrice = _cachedEthPrice
+      if (Date.now() - _ethPriceFetchedAt > ETH_PRICE_CACHE_MS) {
+        try {
+          const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd')
+          if (res.ok) {
+            const data = await res.json()
+            ethPrice = data?.ethereum?.usd ?? _cachedEthPrice
+            _cachedEthPrice = ethPrice
+            _ethPriceFetchedAt = Date.now()
+          }
+        } catch { /* keep cached value */ }
+      }
 
       const ethUsd = (parseFloat(balance.formatted) * ethPrice).toFixed(2)
       set({ ethBalanceUsd: ethUsd })

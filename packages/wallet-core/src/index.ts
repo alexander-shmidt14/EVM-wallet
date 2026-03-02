@@ -388,10 +388,15 @@ export class WalletCore {
       const meta = await this.erc20Meta(validTokenAddress)
       const tokenContract = this.token(validTokenAddress)
       const feeData = await this.provider().getFeeData()
+
+      // Get sender address so estimation simulates from the real wallet,
+      // not from address(0) which has 0 tokens and causes revert.
+      const from = await this.address(0)
       
       const gasLimit = await tokenContract.transfer.estimateGas(
         validTo,
-        parseUnits(amountHuman, meta.decimals)
+        parseUnits(amountHuman, meta.decimals),
+        { from }
       )
 
       const maxFee = feeData.maxFeePerGas || feeData.gasPrice || parseUnits('20', 'gwei')
