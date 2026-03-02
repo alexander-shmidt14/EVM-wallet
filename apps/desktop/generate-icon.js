@@ -1,6 +1,8 @@
 /**
- * Generate EVM Wallet icon (256x256 PNG → ICO) using only built-in Node.js modules.
- * Colors: #09111C background, #BE0E20 red accent border, #f2f2f2 "EVM" text
+ * Generate EVM Wallet icon assets from icon_app.png
+ * Reads the custom icon, decodes PNG, downscales to required sizes,
+ * outputs icon.png (256×256) and icon.ico (16/32/48/256 multi-size).
+ * Uses only built-in Node.js modules.
  */
 const fs = require('fs')
 const zlib = require('zlib')
@@ -19,122 +21,129 @@ function crc32(buf) {
   return (crc ^ 0xffffffff) >>> 0
 }
 
-// ── Pixel buffer helpers ─────────────────────────
-const W = 256, H = 256
-const pixels = Buffer.alloc(W * H * 4) // RGBA
+// ── PNG Decoder (pure Node.js) ───────────────────
+function decodePNG(fileBuffer) {
+  // Verify PNG signature
+  const sig = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
+  if (fileBuffer.subarray(0, 8).compare(sig) !== 0) {
+    throw new Error('Not a valid PNG file')
+  }
 
-function setPixel(x, y, r, g, b, a = 255) {
-  if (x < 0 || x >= W || y < 0 || y >= H) return
-  const i = (y * W + x) * 4
-  pixels[i] = r; pixels[i+1] = g; pixels[i+2] = b; pixels[i+3] = a
-}
+  let offset = 8
+  let width, height, bitDepth, colorType
+  const idatChunks = []
 
-function fillRect(x0, y0, w, h, r, g, b, a = 255) {
-  for (let y = y0; y < y0 + h; y++)
-    for (let x = x0; x < x0 + w; x++)
-      setPixel(x, y, r, g, b, a)
-}
+  // Parse PNG chunks
+  while (offset < fileBuffer.length) {
+    const chunkLen = fileBuffer.readUInt32BE(offset)
+    const chunkType = fileBuffer.subarray(offset + 4, offset + 8).toString('ascii')
+    const chunkData = fileBuffer.subarray(offset + 8, offset + 8 + chunkLen)
+    offset += 12 + chunkLen // 4 len + 4 type + data + 4 crc
 
-function drawRoundedRect(x0, y0, w, h, radius, r, g, b, a = 255) {
-  // Fill main body
-  fillRect(x0 + radius, y0, w - 2 * radius, h, r, g, b, a)
-  fillRect(x0, y0 + radius, w, h - 2 * radius, r, g, b, a)
-  // Fill corners
-  for (let cy = 0; cy < radius; cy++) {
-    for (let cx = 0; cx < radius; cx++) {
-      const dist = Math.sqrt((radius - cx - 0.5) ** 2 + (radius - cy - 0.5) ** 2)
-      if (dist <= radius) {
-        // Top-left
-        setPixel(x0 + cx, y0 + cy, r, g, b, a)
-        // Top-right
-        setPixel(x0 + w - 1 - cx, y0 + cy, r, g, b, a)
-        // Bottom-left
-        setPixel(x0 + cx, y0 + h - 1 - cy, r, g, b, a)
-        // Bottom-right
-        setPixel(x0 + w - 1 - cx, y0 + h - 1 - cy, r, g, b, a)
-      }
+    if (chunkType === 'IHDR') {
+      width = chunkData.readUInt32BE(0)
+      height = chunkData.readUInt32BE(4)
+      bitDepth = chunkData[8]
+      colorType = chunkData[9]
+      const compression = chunkData[10]
+      const filter = chunkData[11]
+      const interlace = chunkData[12]
+      if (interlace !== 0) throw new Error('Interlaced PNGs not supported')
+      if (bitDepth !== 8) throw new Error(`Unsupported bit depth: ${bitDepth}`)
+      console.log(`  Source: ${width}×${height}, bitDepth=${bitDepth}, colorType=${colorType}`)
+    } else if (chunkType === 'IDAT') {
+      idatChunks.push(chunkData)
+    } else if (chunkType === 'IEND') {
+      break
     }
   }
-}
 
-// Simple bitmap font for E, V, M (5x7 grid)
-const FONT = {
-  E: [
-    [1,1,1,1,1],
-    [1,0,0,0,0],
-    [1,0,0,0,0],
-    [1,1,1,1,0],
-    [1,0,0,0,0],
-    [1,0,0,0,0],
-    [1,1,1,1,1],
-  ],
-  V: [
-    [1,0,0,0,1],
-    [1,0,0,0,1],
-    [1,0,0,0,1],
-    [0,1,0,1,0],
-    [0,1,0,1,0],
-    [0,0,1,0,0],
-    [0,0,1,0,0],
-  ],
-  M: [
-    [1,0,0,0,1],
-    [1,1,0,1,1],
-    [1,0,1,0,1],
-    [1,0,1,0,1],
-    [1,0,0,0,1],
-    [1,0,0,0,1],
-    [1,0,0,0,1],
-  ],
-}
+  if (!width || !height) throw new Error('Missing IHDR chunk')
 
-function drawChar(ch, startX, startY, scale, r, g, b) {
-  const bitmap = FONT[ch]
-  if (!bitmap) return
-  for (let row = 0; row < 7; row++) {
-    for (let col = 0; col < 5; col++) {
-      if (bitmap[row][col]) {
-        fillRect(startX + col * scale, startY + row * scale, scale, scale, r, g, b)
+  // Determine bytes per pixel
+  let bpp
+  switch (colorType) {
+    case 0: bpp = 1; break // Grayscale
+    case 2: bpp = 3; break // RGB
+    case 4: bpp = 2; break // Grayscale+Alpha
+    case 6: bpp = 4; break // RGBA
+    default: throw new Error(`Unsupported color type: ${colorType}`)
+  }
+
+  // Decompress IDAT data
+  const compressedData = Buffer.concat(idatChunks)
+  const rawData = zlib.inflateSync(compressedData)
+
+  const rowBytes = width * bpp
+  const rgba = Buffer.alloc(width * height * 4)
+
+  // Un-filter rows
+  let rawOffset = 0
+  const prevRow = Buffer.alloc(rowBytes)
+  const curRow = Buffer.alloc(rowBytes)
+  prevRow.fill(0)
+
+  for (let y = 0; y < height; y++) {
+    const filterType = rawData[rawOffset++]
+
+    // Read current filtered row
+    rawData.copy(curRow, 0, rawOffset, rawOffset + rowBytes)
+    rawOffset += rowBytes
+
+    // Apply PNG filter reconstruction
+    for (let i = 0; i < rowBytes; i++) {
+      const a = i >= bpp ? curRow[i - bpp] : 0 // left
+      const b = prevRow[i]                       // up
+      const c = i >= bpp ? prevRow[i - bpp] : 0  // upper-left
+
+      switch (filterType) {
+        case 0: break // None
+        case 1: curRow[i] = (curRow[i] + a) & 0xFF; break // Sub
+        case 2: curRow[i] = (curRow[i] + b) & 0xFF; break // Up
+        case 3: curRow[i] = (curRow[i] + Math.floor((a + b) / 2)) & 0xFF; break // Average
+        case 4: { // Paeth
+          const p = a + b - c
+          const pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c)
+          const pr = pa <= pb && pa <= pc ? a : pb <= pc ? b : c
+          curRow[i] = (curRow[i] + pr) & 0xFF
+          break
+        }
+        default: throw new Error(`Unknown filter type: ${filterType} at row ${y}`)
       }
     }
+
+    // Convert to RGBA
+    for (let x = 0; x < width; x++) {
+      const di = (y * width + x) * 4
+      switch (colorType) {
+        case 0: // Grayscale
+          rgba[di] = rgba[di+1] = rgba[di+2] = curRow[x]
+          rgba[di+3] = 255
+          break
+        case 2: // RGB
+          rgba[di]   = curRow[x * 3]
+          rgba[di+1] = curRow[x * 3 + 1]
+          rgba[di+2] = curRow[x * 3 + 2]
+          rgba[di+3] = 255
+          break
+        case 4: // Grayscale+Alpha
+          rgba[di] = rgba[di+1] = rgba[di+2] = curRow[x * 2]
+          rgba[di+3] = curRow[x * 2 + 1]
+          break
+        case 6: // RGBA
+          rgba[di]   = curRow[x * 4]
+          rgba[di+1] = curRow[x * 4 + 1]
+          rgba[di+2] = curRow[x * 4 + 2]
+          rgba[di+3] = curRow[x * 4 + 3]
+          break
+      }
+    }
+
+    // Save current row as previous
+    curRow.copy(prevRow)
   }
-}
 
-function drawText(text, centerX, centerY, scale, r, g, b) {
-  const charW = 5 * scale
-  const gap = Math.ceil(scale * 1.2)
-  const totalW = text.length * charW + (text.length - 1) * gap
-  let x = centerX - Math.floor(totalW / 2)
-  const y = centerY - Math.floor(7 * scale / 2)
-  for (const ch of text) {
-    drawChar(ch, x, y, scale, r, g, b)
-    x += charW + gap
-  }
-}
-
-// ── Draw the icon ────────────────────────────────
-// Background (fully transparent by default, then draw rounded rect)
-// Fill with transparent first
-pixels.fill(0)
-
-// Outer rounded rectangle — red accent border
-const borderWidth = 8
-const cornerRadius = 40
-drawRoundedRect(0, 0, W, H, cornerRadius, 0xBE, 0x0E, 0x20)
-
-// Inner rounded rectangle — dark background
-drawRoundedRect(borderWidth, borderWidth, W - 2 * borderWidth, H - 2 * borderWidth, cornerRadius - borderWidth, 0x09, 0x11, 0x1C)
-
-// Draw "EVM" text
-drawText('EVM', W / 2, H / 2, 8, 0xf2, 0xf2, 0xf2)
-
-// Subtle red glow line at the bottom
-const glowY = H - borderWidth - 20
-for (let x = cornerRadius; x < W - cornerRadius; x++) {
-  const dist = Math.abs(x - W / 2)
-  const alpha = Math.max(0, Math.min(255, 255 - Math.floor(dist * 2.2)))
-  setPixel(x, glowY, 0xBE, 0x0E, 0x20, alpha)
-  setPixel(x, glowY + 1, 0xBE, 0x0E, 0x20, Math.floor(alpha * 0.5))
+  return { width, height, rgba }
 }
 
 // ── Encode PNG ───────────────────────────────────
@@ -151,7 +160,6 @@ function makePNGChunk(type, data) {
 function encodePNG(width, height, rgba) {
   const sig = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
 
-  // IHDR
   const ihdr = Buffer.alloc(13)
   ihdr.writeUInt32BE(width, 0)
   ihdr.writeUInt32BE(height, 4)
@@ -161,7 +169,6 @@ function encodePNG(width, height, rgba) {
   ihdr[11] = 0 // filter
   ihdr[12] = 0 // interlace
 
-  // IDAT — add filter byte per row
   const rowLen = 1 + width * 4
   const raw = Buffer.alloc(height * rowLen)
   for (let y = 0; y < height; y++) {
@@ -179,20 +186,21 @@ function encodePNG(width, height, rgba) {
 }
 
 // ── Encode ICO ───────────────────────────────────
-function encodeICO(pngBuffers) {
-  // ICO header: 6 bytes
+function encodeICO(pngBuffers, sizes) {
   const header = Buffer.alloc(6)
   header.writeUInt16LE(0, 0)       // reserved
   header.writeUInt16LE(1, 2)       // type: icon
-  header.writeUInt16LE(pngBuffers.length, 4) // image count
+  header.writeUInt16LE(pngBuffers.length, 4)
 
   const entries = []
   let dataOffset = 6 + pngBuffers.length * 16
 
-  for (const png of pngBuffers) {
+  for (let i = 0; i < pngBuffers.length; i++) {
+    const png = pngBuffers[i]
+    const sz = sizes[i]
     const entry = Buffer.alloc(16)
-    entry[0] = 0   // width (0 = 256)
-    entry[1] = 0   // height (0 = 256)
+    entry[0] = sz < 256 ? sz : 0  // width (0 = 256)
+    entry[1] = sz < 256 ? sz : 0  // height (0 = 256)
     entry[2] = 0   // colors
     entry[3] = 0   // reserved
     entry.writeUInt16LE(1, 4)      // planes
@@ -206,19 +214,18 @@ function encodeICO(pngBuffers) {
   return Buffer.concat([header, ...entries, ...pngBuffers])
 }
 
-// ── Generate smaller sizes ───────────────────────
+// ── Downscale with area-average sampling ─────────
 function downscale(srcRGBA, srcW, srcH, dstW, dstH) {
   const dst = Buffer.alloc(dstW * dstH * 4)
   const scaleX = srcW / dstW
   const scaleY = srcH / dstH
   for (let y = 0; y < dstH; y++) {
     for (let x = 0; x < dstW; x++) {
-      // Simple area-average downscaling
       let r = 0, g = 0, b = 0, a = 0, count = 0
       const sx0 = Math.floor(x * scaleX)
       const sy0 = Math.floor(y * scaleY)
-      const sx1 = Math.floor((x + 1) * scaleX)
-      const sy1 = Math.floor((y + 1) * scaleY)
+      const sx1 = Math.min(Math.floor((x + 1) * scaleX), srcW)
+      const sy1 = Math.min(Math.floor((y + 1) * scaleY), srcH)
       for (let sy = sy0; sy < sy1; sy++) {
         for (let sx = sx0; sx < sx1; sx++) {
           const i = (sy * srcW + sx) * 4
@@ -226,6 +233,7 @@ function downscale(srcRGBA, srcW, srcH, dstW, dstH) {
           count++
         }
       }
+      if (count === 0) count = 1
       const di = (y * dstW + x) * 4
       dst[di]   = Math.round(r / count)
       dst[di+1] = Math.round(g / count)
@@ -236,25 +244,42 @@ function downscale(srcRGBA, srcW, srcH, dstW, dstH) {
   return dst
 }
 
-// ── Write files ──────────────────────────────────
+// ── Main ─────────────────────────────────────────
 const outDir = path.join(__dirname, 'assets')
 if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true })
 
-const png256 = encodePNG(256, 256, pixels)
+// Read and decode source icon
+const srcPath = path.join(outDir, 'icon_app.png')
+if (!fs.existsSync(srcPath)) {
+  console.error(`ERROR: Source icon not found at ${srcPath}`)
+  console.error('Place your icon_app.png in apps/desktop/assets/')
+  process.exit(1)
+}
 
-// Smaller sizes for ICO
+console.log('Reading source icon: ' + srcPath)
+const srcBuf = fs.readFileSync(srcPath)
+const { width: srcW, height: srcH, rgba: srcRGBA } = decodePNG(srcBuf)
+
+// Downscale source to 256×256 for the main icon.png
+console.log('Downscaling to 256×256...')
+const pixels256 = downscale(srcRGBA, srcW, srcH, 256, 256)
+const png256 = encodePNG(256, 256, pixels256)
+
+// Generate multi-size ICO (16, 32, 48, 256)
 const sizes = [16, 32, 48, 256]
+console.log('Generating ICO sizes:', sizes.join(', '))
 const pngBuffers = sizes.map(sz => {
   if (sz === 256) return png256
-  const scaled = downscale(pixels, 256, 256, sz, sz)
+  const scaled = downscale(srcRGBA, srcW, srcH, sz, sz)
   return encodePNG(sz, sz, scaled)
 })
 
-const ico = encodeICO(pngBuffers)
+const ico = encodeICO(pngBuffers, sizes)
 
 fs.writeFileSync(path.join(outDir, 'icon.png'), png256)
 fs.writeFileSync(path.join(outDir, 'icon.ico'), ico)
 
-console.log('Generated:')
+console.log('\nGenerated:')
 console.log('  assets/icon.png (' + png256.length + ' bytes)')
 console.log('  assets/icon.ico (' + ico.length + ' bytes)')
+console.log('Done!')
