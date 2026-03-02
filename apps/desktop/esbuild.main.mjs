@@ -25,10 +25,10 @@ const commonOptions = {
   },
 }
 
-// Build main process
+// Build main process (backend)
 await build({
   ...commonOptions,
-  entryPoints: [resolve(__dirname, 'src/main.ts')],
+  entryPoints: [resolve(__dirname, 'src/backend/main.ts')],
   outfile: resolve(__dirname, 'dist/main.js'),
 })
 
@@ -37,7 +37,7 @@ await build({
   ...commonOptions,
   format: 'iife',
   sourcemap: false,
-  entryPoints: [resolve(__dirname, 'src/preload.ts')],
+  entryPoints: [resolve(__dirname, 'src/backend/preload.ts')],
   outfile: resolve(__dirname, 'dist/preload.js'),
 })
 

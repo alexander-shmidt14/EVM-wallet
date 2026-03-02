@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWalletStore } from '../store/wallet'
-import { Loading } from '../../components/Loading'
+import { Loading } from '../components/Loading'
 
 export const OnboardingScreen: React.FC = () => {
   const navigate = useNavigate()

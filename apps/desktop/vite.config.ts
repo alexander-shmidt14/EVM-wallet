@@ -5,7 +5,7 @@ import { resolve } from 'path'
 export default defineConfig({
   plugins: [react()],
   base: './',
-  root: 'src/renderer',
+  root: 'src/frontend',
   build: {
     outDir: '../../dist/renderer',
     emptyOutDir: true,
@@ -15,7 +15,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src/renderer'),
+      '@': resolve(__dirname, 'src/frontend'),
       '@wallet/wallet-core': resolve(__dirname, '../../packages/wallet-core/dist'),
       '@wallet/ui-tokens': resolve(__dirname, '../../packages/ui-tokens/dist'),
       buffer: 'buffer',
