@@ -56,6 +56,11 @@ coverage/
 *.lcov
 .nyc_output
 
+# ─── Obsidian ───────────────────────────────────
+docs/.obsidian/workspace.json
+docs/.obsidian/workspace-mobile.json
+docs/.obsidian/cache/
+
 # ─── Misc ───────────────────────────────────────
 .cache
 .eslintcache
