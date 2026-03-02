@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "ignoreDeprecations": "5.0",
     "target": "ES2020",
     "lib": [
       "DOM",
@@ -20,7 +19,6 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "baseUrl": ".",
     "paths": {
       "@wallet/wallet-core": ["../../packages/wallet-core/dist"],
       "@wallet/ui-tokens": ["../../packages/ui-tokens/dist"]

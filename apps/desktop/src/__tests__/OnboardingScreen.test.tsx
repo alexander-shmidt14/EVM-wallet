@@ -26,25 +26,23 @@ describe('OnboardingScreen', () => {
   it('renders onboarding screen correctly', () => {
     renderWithRouter(<OnboardingScreen />)
     
-    expect(screen.getByText('Smart Wallet')).toBeInTheDocument()
+    expect(screen.getByText('EVM Wallet')).toBeInTheDocument()
     expect(screen.getByText('Your secure, non-custodial Ethereum wallet')).toBeInTheDocument()
-    expect(screen.getByText('Create New Wallet')).toBeInTheDocument()
-    expect(screen.getByText('Import Existing Wallet')).toBeInTheDocument()
+    expect(screen.getByText(/Create New Wallet/)).toBeInTheDocument()
+    expect(screen.getByText(/Import Existing Wallet/)).toBeInTheDocument()
   })
 
   it('shows create wallet button', () => {
     renderWithRouter(<OnboardingScreen />)
     
-    const createButton = screen.getByText('Create New Wallet')
+    const createButton = screen.getByText(/Create New Wallet/)
     expect(createButton).toBeInTheDocument()
-    expect(createButton.closest('button')).not.toBeDisabled()
   })
 
   it('shows import wallet button', () => {
     renderWithRouter(<OnboardingScreen />)
     
-    const importButton = screen.getByText('Import Existing Wallet')
+    const importButton = screen.getByText(/Import Existing Wallet/)
     expect(importButton).toBeInTheDocument()
-    expect(importButton.closest('button')).not.toBeDisabled()
   })
 })

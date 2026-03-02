@@ -1,5 +1,5 @@
-# ─── CI: Lint, Typecheck, Test ──────────────────────────────────────
-# Runs on EVERY push and PR to dev / staging / main
+# ─── CI: Audit, Typecheck, Test, Build Validation ───────────────────
+# Triggers: every push and PR to dev / staging / main
 name: CI
 
 on:
@@ -12,19 +12,27 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  NODE_VERSION: "20"
+
 jobs:
-  # ── Install & Cache ───────────────────────────────────────────────
+  # ── 1. Install, cache, security audit ─────────────────────────────
   install:
+    name: "Install & Audit"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with: { version: 9 }
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Security audit
+        run: pnpm audit --audit-level=high || true
 
       - uses: actions/cache/save@v4
         with:
@@ -34,16 +42,17 @@ jobs:
             apps/*/node_modules
           key: deps-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
-  # ── Build shared packages ─────────────────────────────────────────
+  # ── 2. Build shared packages ──────────────────────────────────────
   build-packages:
+    name: "Build packages"
     needs: install
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with: { version: 9 }
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        with:
+          node-version: ${{ env.NODE_VERSION }}
 
       - uses: actions/cache/restore@v4
         with:
@@ -55,6 +64,7 @@ jobs:
 
       - name: Build wallet-core
         run: pnpm -F @wallet/wallet-core build
+
       - name: Build ui-tokens
         run: pnpm -F @wallet/ui-tokens build
 
@@ -65,11 +75,13 @@ jobs:
             packages/ui-tokens/dist
           key: packages-${{ github.sha }}
 
-  # ── Typecheck ─────────────────────────────────────────────────────
+  # ── 3. Typecheck (matrix: wallet-core + desktop) ──────────────────
   typecheck:
+    name: "Typecheck ${{ matrix.package }}"
     needs: build-packages
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         package:
           - "@wallet/wallet-core"
@@ -77,9 +89,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with: { version: 9 }
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        with:
+          node-version: ${{ env.NODE_VERSION }}
 
       - uses: actions/cache/restore@v4
         with:
@@ -98,16 +110,17 @@ jobs:
       - name: Typecheck ${{ matrix.package }}
         run: pnpm -F "${{ matrix.package }}" typecheck
 
-  # ── Unit Tests ────────────────────────────────────────────────────
+  # ── 4. Unit Tests + Coverage ──────────────────────────────────────
   test:
+    name: "Tests"
     needs: build-packages
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with: { version: 9 }
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        with:
+          node-version: ${{ env.NODE_VERSION }}
 
       - uses: actions/cache/restore@v4
         with:
@@ -123,19 +136,29 @@ jobs:
             packages/ui-tokens/dist
           key: packages-${{ github.sha }}
 
-      - name: Run desktop tests
-        run: pnpm -F @app/desktop test -- --passWithNoTests --ci
+      - name: Run tests with coverage
+        run: pnpm -F @app/desktop test -- --passWithNoTests --ci --coverage
 
-  # ── Build validation (renderer compiles) ──────────────────────────
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: apps/desktop/coverage/
+          retention-days: 14
+        continue-on-error: true
+
+  # ── 5. Full build validation (main + renderer compile) ────────────
   build-check:
+    name: "Build check"
     needs: build-packages
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with: { version: 9 }
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        with:
+          node-version: ${{ env.NODE_VERSION }}
 
       - uses: actions/cache/restore@v4
         with:
@@ -153,5 +176,29 @@ jobs:
 
       - name: Build main process
         run: pnpm -F @app/desktop build:main
+
       - name: Build renderer
         run: pnpm -F @app/desktop build:renderer
+
+      - name: Verify build outputs exist
+        run: |
+          test -f apps/desktop/dist/main.js && echo "✅ main.js OK" || (echo "❌ main.js missing" && exit 1)
+          test -d apps/desktop/dist/renderer && echo "✅ renderer/ OK" || (echo "❌ renderer/ missing" && exit 1)
+
+  # ── 6. CI status gate (all checks must pass for merge) ────────────
+  ci-status:
+    name: "CI Status"
+    if: always()
+    needs: [install, build-packages, typecheck, test, build-check]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check all jobs passed
+        run: |
+          results=("${{ needs.install.result }}" "${{ needs.build-packages.result }}" "${{ needs.typecheck.result }}" "${{ needs.test.result }}" "${{ needs.build-check.result }}")
+          for r in "${results[@]}"; do
+            if [ "$r" != "success" ]; then
+              echo "❌ CI failed: one or more jobs did not succeed"
+              exit 1
+            fi
+          done
+          echo "✅ All CI checks passed"

@@ -1,30 +1,41 @@
 # ─── Build & Release: Android APK ───────────────────────────────────
-# Builds Android APK on push to staging/main or tag
+# Triggers:
+#   - Push to staging or main → builds APK, uploads as artifact
+#   - Tag v* → builds + creates GitHub Release with APK
+#   - Manual dispatch for ad-hoc builds
 name: Android Build
 
 on:
   push:
     branches: [staging, main]
     tags: ["v*"]
+  pull_request:
+    branches: [staging, main]
   workflow_dispatch:
 
 concurrency:
   group: android-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  NODE_VERSION: "20"
+  JAVA_VERSION: "17"
+
 jobs:
   build-android:
+    name: "Build Android APK"
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with: { version: 9 }
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
       - name: Install dependencies
@@ -39,34 +50,54 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: ${{ env.JAVA_VERSION }}
 
       - uses: android-actions/setup-android@v3
 
       - name: Make gradlew executable
         run: chmod +x apps/mobile/android/gradlew
 
-      - name: Build Android APK
-        run: cd apps/mobile/android && ./gradlew assembleRelease
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('apps/mobile/android/**/*.gradle*') }}
+          restore-keys: gradle-${{ runner.os }}-
 
-      - name: Generate checksum
+      - name: Build Android APK
+        run: |
+          cd apps/mobile/android
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Verify APK exists
+        run: |
+          APK=$(find apps/mobile/android/app/build/outputs/apk/release -name "*.apk" -type f | head -1)
+          if [ -z "$APK" ]; then echo "❌ APK not found" && exit 1; fi
+          echo "✅ APK built: $APK ($(du -h "$APK" | cut -f1))"
+
+      - name: Generate checksums
         run: |
           cd apps/mobile/android/app/build/outputs/apk/release
-          sha256sum *.apk > checksums.txt
+          sha256sum *.apk > checksums-sha256.txt
+          cat checksums-sha256.txt
 
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk-${{ github.sha }}
+          name: EVM-Wallet-Android-${{ github.sha }}
           path: |
             apps/mobile/android/app/build/outputs/apk/release/*.apk
-            apps/mobile/android/app/build/outputs/apk/release/checksums.txt
+            apps/mobile/android/app/build/outputs/apk/release/checksums-sha256.txt
           retention-days: 30
+          if-no-files-found: error
 
-      - name: Upload to Release
+      - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          generate_release_notes: true
           files: |
             apps/mobile/android/app/build/outputs/apk/release/*.apk
-            apps/mobile/android/app/build/outputs/apk/release/checksums.txt
+            apps/mobile/android/app/build/outputs/apk/release/checksums-sha256.txt
