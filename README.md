@@ -129,6 +129,30 @@ ALCHEMY_RPC_MAINNET=https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY
 ETHERSCAN_API_KEY=YOUR_KEY
 ```
 
+## Documentation
+
+Полная документация проекта — Obsidian vault в папке `docs/`.
+
+```bash
+# Открыть в Obsidian:
+# 1. File → Open Vault → выбрать папку docs/
+# 2. Или: Open folder as vault → docs/
+```
+
+Структура документации:
+
+| Раздел | Описание |
+|--------|----------|
+| `architecture/` | Архитектура, data flow, безопасность |
+| `backend/` | Electron main process, IPC, secure store |
+| `frontend/` | React UI, store, компоненты, 8 экранов |
+| `packages/` | wallet-core, ui-tokens |
+| `devops/` | CI/CD, Docker, Git-стратегия, релизы |
+| `guides/` | Быстрый старт, ENV, contributing |
+| `changelog/` | Лог изменений |
+
+> Документация написана на русском языке с Mermaid-диаграммами и wikilinks для навигации.
+
 ## Security
 
 - Non-custodial: private keys never leave the device
