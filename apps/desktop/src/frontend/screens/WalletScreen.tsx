@@ -142,8 +142,10 @@ export const WalletScreen: React.FC = () => {
       {/* Balance Card */}
       <div className="card text-center mb-8 bg-dark-800 border-dark-600">
         <p className="text-sm text-gray-400 mb-2">Total Balance</p>
+
+        <p className="text-4xl font-bold text-[#f2f2f2]">≈ {'$'}{totalBalanceUsd || '0.00'} USD</p>
+
         <div className="flex items-center justify-center mb-2">
-          <p className="text-4xl font-bold text-[#f2f2f2]">≈ {'$'}{totalBalanceUsd || '0.00'} USD</p>
           {ethBalance ? (
             <span className="text-gray-500">{ethBalance} ETH</span>
           ) : isLoading ? (
@@ -220,7 +222,8 @@ export const WalletScreen: React.FC = () => {
               <span className="text-white font-bold text-xs">MMA</span>
             </div>
             <div>
-              <p className="font-medium text-[#f2f2f2]">MMA Token</p>
+              {/* MMA Token */}
+              <p className="font-medium text-[#f2f2f2]">MMA Coin</p>
               <p className="text-sm text-gray-500">MMA</p>
             </div>
           </div>
