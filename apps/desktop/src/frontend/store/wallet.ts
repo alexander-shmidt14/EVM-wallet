@@ -1,5 +1,28 @@
 ﻿import { create } from 'zustand'
 
+export interface TransactionInfo {
+  hash: string
+  from: string
+  to: string
+  value: string
+  type: 'eth' | 'erc20'
+  tokenAddress?: string
+  tokenSymbol?: string
+  tokenDecimals?: number
+  timestamp: number
+  status: 'pending' | 'confirmed' | 'failed'
+  blockNumber?: number
+  direction?: 'in' | 'out'
+  confirmations?: number
+}
+
+export interface TransactionStatus {
+  confirmations: number
+  currentBlock: number
+  txBlock: number | null
+  status: 'pending' | 'confirmed' | 'failed'
+}
+
 interface ElectronAPI {
   // Auth
   hasPassword: () => Promise<boolean>
@@ -26,8 +49,10 @@ interface ElectronAPI {
   sendErc20: (accountIndex: number, tokenAddress: string, to: string, amount: string) => Promise<any>
   estimateEthGas: (to: string, amount: string) => Promise<any>
   estimateErc20Gas: (tokenAddress: string, to: string, amount: string) => Promise<any>
-  getLocalTransactions: () => Promise<any[]>
+  getLocalTransactions: (address?: string) => Promise<any[]>
   getIncomingTransactions: (address: string, limit?: number) => Promise<any[]>
+  getTransactionHistory: (address: string, limit?: number) => Promise<TransactionInfo[]>
+  getTransactionStatus: (txHash: string) => Promise<TransactionStatus>
   getSeedPhrase: () => Promise<string>
   resetWallet: () => Promise<void>
 }
@@ -71,6 +96,10 @@ interface WalletState {
   isLoading: boolean
   error: string | null
 
+  // Transactions
+  transactions: TransactionInfo[]
+  isLoadingTransactions: boolean
+
   // Auth actions
   checkAuth: () => Promise<void>
   setPassword: (password: string) => Promise<void>
@@ -88,6 +117,7 @@ interface WalletState {
   initialize: () => Promise<void>
   loadBalance: () => Promise<void>
   loadSeedPhrase: () => Promise<void>
+  loadTransactions: () => Promise<void>
   reset: () => Promise<void>
 }
 
@@ -109,6 +139,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   totalBalanceUsd: null,
   isLoading: false,
   error: null,
+  transactions: [],
+  isLoadingTransactions: false,
 
   // ─── Auth actions ──────────────────────────
   checkAuth: async () => {
@@ -220,6 +252,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         ethBalance: null,
         mmaBalance: null,
         mmaBalanceUsd: null,
+        transactions: [],
         isLoading: false,
       })
 
@@ -349,6 +382,20 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       set({ seedPhrase: phrase })
     } catch (e) {
       console.error('Failed to load seed phrase:', e)
+    }
+  },
+
+  loadTransactions: async () => {
+    try {
+      const { currentAddress } = get()
+      if (!currentAddress) return
+
+      set({ isLoadingTransactions: true })
+      const transactions = await window.electronAPI.getTransactionHistory(currentAddress, 50)
+      set({ transactions, isLoadingTransactions: false })
+    } catch (error) {
+      console.error('Failed to load transactions:', error)
+      set({ isLoadingTransactions: false })
     }
   },
 

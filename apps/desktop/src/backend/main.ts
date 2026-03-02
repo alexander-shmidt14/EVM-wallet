@@ -214,14 +214,24 @@ ipcMain.handle('wallet:estimateErc20Gas', async (_, tokenAddress: string, to: st
   return walletCore.estimateErc20Gas(tokenAddress, to, amount)
 })
 
-ipcMain.handle('wallet:getLocalTransactions', async () => {
+ipcMain.handle('wallet:getLocalTransactions', async (_, address?: string) => {
   if (!walletCore) throw new Error('Wallet core not initialized')
-  return walletCore.getLocalTransactions()
+  return walletCore.getLocalTransactions(address)
 })
 
 ipcMain.handle('wallet:getIncomingTransactions', async (_, address: string, limit: number = 50) => {
   if (!walletCore) throw new Error('Wallet core not initialized')
   return walletCore.getIncomingTransactions(address, limit)
+})
+
+ipcMain.handle('wallet:getTransactionHistory', async (_, address: string, limit: number = 50) => {
+  if (!walletCore) throw new Error('Wallet core not initialized')
+  return walletCore.getTransactionHistory(address, limit)
+})
+
+ipcMain.handle('wallet:getTransactionStatus', async (_, txHash: string) => {
+  if (!walletCore) throw new Error('Wallet core not initialized')
+  return walletCore.getTransactionStatus(txHash)
 })
 
 ipcMain.handle('wallet:getSeedPhrase', async () => {

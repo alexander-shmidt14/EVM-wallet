@@ -1,8 +1,10 @@
 ﻿import React, { useEffect, useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useWalletStore } from '../store/wallet'
+import { useWalletStore, TransactionInfo } from '../store/wallet'
 import { EthIcon } from '../components/icons/EthIcon'
 import { MmaIcon } from '../components/icons/MmaIcon'
+import { TransactionItem } from '../components/TransactionItem'
+import { TransactionDetailPopup } from '../components/TransactionDetailPopup'
 
 export const WalletScreen: React.FC = () => {
   const navigate = useNavigate()
@@ -19,23 +21,32 @@ export const WalletScreen: React.FC = () => {
     loadBalance,
     loadSeedPhrase,
     deleteWallet,
-    isLoading 
+    isLoading,
+    transactions,
+    isLoadingTransactions,
+    loadTransactions,
   } = useWalletStore()
 
   const [seedVisible, setSeedVisible] = useState(false)
   const [seedCopied, setSeedCopied] = useState(false)
   const [addressCopied, setAddressCopied] = useState(false)
+  const [selectedTx, setSelectedTx] = useState<TransactionInfo | null>(null)
 
   useEffect(() => {
     loadBalance()
     loadSeedPhrase()
-    const interval = setInterval(loadBalance, 30000)
+    loadTransactions()
+    const interval = setInterval(() => {
+      loadBalance()
+      loadTransactions()
+    }, 30000)
     return () => clearInterval(interval)
-  }, [loadBalance, loadSeedPhrase])
+  }, [loadBalance, loadSeedPhrase, loadTransactions])
 
   const onRefresh = useCallback(() => {
     loadBalance()
-  }, [loadBalance])
+    loadTransactions()
+  }, [loadBalance, loadTransactions])
 
   const formatAddress = (address: string) => {
     return `${address.slice(0, 8)}...${address.slice(-6)}`
@@ -242,14 +253,45 @@ export const WalletScreen: React.FC = () => {
       <div>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-[#f2f2f2]">Recent Transactions</h2>
+          {transactions.length > 5 && (
+            <button className="text-primary-500 hover:text-primary-400 text-sm font-medium transition-colors">
+              View All
+            </button>
+          )}
         </div>
-        
-        <div className="text-center py-12">
-          <p className="text-gray-500">
-            No recent transactions.
-          </p>
-        </div>
+
+        {isLoadingTransactions && transactions.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-3"></div>
+            <p className="text-gray-500 text-sm">Loading transactions...</p>
+          </div>
+        ) : transactions.length > 0 ? (
+          <div className="space-y-1">
+            {transactions.slice(0, 10).map((tx) => (
+              <TransactionItem
+                key={tx.hash}
+                tx={tx}
+                currentAddress={currentAddress}
+                onClick={() => setSelectedTx(tx)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <p className="text-gray-500">
+              No recent transactions.
+            </p>
+          </div>
+        )}
       </div>
+
+      {/* Transaction Detail Popup */}
+      {selectedTx && (
+        <TransactionDetailPopup
+          tx={selectedTx}
+          onClose={() => setSelectedTx(null)}
+        />
+      )}
 
       {/* Wallet Management */}
       <div className="mt-8 pt-6 border-t border-dark-600">

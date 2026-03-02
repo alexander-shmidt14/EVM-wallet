@@ -27,6 +27,11 @@ export type { TokenMetadata } from './meta'
 const SEED_KEY = 'seed_v1'
 const TRANSACTIONS_KEY = 'transactions_v1'
 
+/** Per-wallet transaction storage key */
+function txKey(address: string): string {
+  return `transactions_v1_${address.toLowerCase()}`
+}
+
 export interface TokenBalance {
   raw: string
   decimals: number
@@ -58,6 +63,15 @@ export interface TransactionInfo {
   timestamp: number
   status: 'pending' | 'confirmed' | 'failed'
   blockNumber?: number
+  direction?: 'in' | 'out'
+  confirmations?: number
+}
+
+export interface TransactionStatus {
+  confirmations: number
+  currentBlock: number
+  txBlock: number | null
+  status: 'pending' | 'confirmed' | 'failed'
 }
 
 export class WalletCore {
@@ -168,22 +182,23 @@ export class WalletCore {
 
       const sentTx = await signer.sendTransaction(tx)
       
-      // Сохраняем транзакцию в локальный журнал
-      await this.saveTransaction({
+      // Сохраняем транзакцию в локальный журнал (per-wallet)
+      await this.saveTransaction(signer.address, {
         hash: sentTx.hash,
         from: signer.address,
         to: validTo,
         value: amountEth,
         type: 'eth',
         timestamp: Date.now(),
-        status: 'pending'
+        status: 'pending',
+        direction: 'out'
       })
 
       const receipt = await sentTx.wait()
       
       // Обновляем статус в журнале
       if (receipt) {
-        await this.updateTransactionStatus(sentTx.hash, receipt.status === 1 ? 'confirmed' : 'failed', receipt.blockNumber)
+        await this.updateTransactionStatus(signer.address, sentTx.hash, receipt.status === 1 ? 'confirmed' : 'failed', receipt.blockNumber)
       }
 
       return receipt
@@ -302,8 +317,8 @@ export class WalletCore {
         }
       )
 
-      // Сохраняем транзакцию в локальный журнал
-      await this.saveTransaction({
+      // Сохраняем транзакцию в локальный журнал (per-wallet)
+      await this.saveTransaction(signer.address, {
         hash: tx.hash,
         from: signer.address,
         to: validTo,
@@ -313,14 +328,15 @@ export class WalletCore {
         tokenSymbol: meta.symbol,
         tokenDecimals: meta.decimals,
         timestamp: Date.now(),
-        status: 'pending'
+        status: 'pending',
+        direction: 'out'
       })
 
       const receipt = await tx.wait()
       
       // Обновляем статус в журнале
       if (receipt) {
-        await this.updateTransactionStatus(tx.hash, receipt.status === 1 ? 'confirmed' : 'failed', receipt.blockNumber)
+        await this.updateTransactionStatus(signer.address, tx.hash, receipt.status === 1 ? 'confirmed' : 'failed', receipt.blockNumber)
       }
 
       return receipt
@@ -397,11 +413,12 @@ export class WalletCore {
   }
 
   /**
-   * Сохраняет транзакцию в локальный журнал
+   * Сохраняет транзакцию в локальный журнал (per-wallet by address)
    */
-  private async saveTransaction(tx: TransactionInfo): Promise<void> {
+  private async saveTransaction(walletAddress: string, tx: TransactionInfo): Promise<void> {
     try {
-      const stored = await this.store.get(TRANSACTIONS_KEY)
+      const key = txKey(walletAddress)
+      const stored = await this.store.get(key)
       const transactions: TransactionInfo[] = stored ? JSON.parse(stored) : []
       
       transactions.unshift(tx) // Новые транзакции в начало
@@ -411,18 +428,19 @@ export class WalletCore {
         transactions.splice(1000)
       }
       
-      await this.store.set(TRANSACTIONS_KEY, JSON.stringify(transactions))
+      await this.store.set(key, JSON.stringify(transactions))
     } catch (error) {
       console.error('Save transaction error:', error)
     }
   }
 
   /**
-   * Обновляет статус транзакции
+   * Обновляет статус транзакции (per-wallet by address)
    */
-  private async updateTransactionStatus(hash: string, status: 'confirmed' | 'failed', blockNumber?: number): Promise<void> {
+  private async updateTransactionStatus(walletAddress: string, hash: string, status: 'confirmed' | 'failed', blockNumber?: number): Promise<void> {
     try {
-      const stored = await this.store.get(TRANSACTIONS_KEY)
+      const key = txKey(walletAddress)
+      const stored = await this.store.get(key)
       if (!stored) return
 
       const transactions: TransactionInfo[] = JSON.parse(stored)
@@ -433,7 +451,7 @@ export class WalletCore {
         if (blockNumber) {
           transactions[txIndex].blockNumber = blockNumber
         }
-        await this.store.set(TRANSACTIONS_KEY, JSON.stringify(transactions))
+        await this.store.set(key, JSON.stringify(transactions))
       }
     } catch (error) {
       console.error('Update transaction status error:', error)
@@ -441,15 +459,95 @@ export class WalletCore {
   }
 
   /**
-   * Получает локальные транзакции
+   * Получает локальные транзакции для конкретного адреса (per-wallet)
    */
-  async getLocalTransactions(): Promise<TransactionInfo[]> {
+  async getLocalTransactions(address?: string): Promise<TransactionInfo[]> {
     try {
+      // Per-wallet storage
+      if (address) {
+        const stored = await this.store.get(txKey(address))
+        return stored ? JSON.parse(stored) : []
+      }
+      // Legacy fallback — global key
       const stored = await this.store.get(TRANSACTIONS_KEY)
       return stored ? JSON.parse(stored) : []
     } catch (error) {
       console.error('Get local transactions error:', error)
       return []
+    }
+  }
+
+  /**
+   * Объединённая история транзакций: локальные (out) + incoming (in)
+   * Дедупликация по hash, сортировка по timestamp desc
+   */
+  async getTransactionHistory(address: string, limit = 50): Promise<TransactionInfo[]> {
+    try {
+      // 1. Получаем локальные (исходящие) транзакции
+      const local = await this.getLocalTransactions(address)
+      const localWithDir = local.map(tx => ({ ...tx, direction: (tx.direction || 'out') as 'in' | 'out' }))
+
+      // 2. Получаем входящие через Etherscan
+      const incoming = await this.getIncomingTransactions(address, limit)
+      const incomingWithDir = incoming.map(tx => ({ ...tx, direction: 'in' as const }))
+
+      // 3. Merge + deduplicate by hash
+      const seen = new Set<string>()
+      const merged: TransactionInfo[] = []
+
+      for (const tx of [...localWithDir, ...incomingWithDir]) {
+        if (!seen.has(tx.hash)) {
+          seen.add(tx.hash)
+          merged.push(tx)
+        }
+      }
+
+      // 4. Sort by timestamp descending (newest first)
+      merged.sort((a, b) => b.timestamp - a.timestamp)
+
+      return merged.slice(0, limit)
+    } catch (error) {
+      console.error('Get transaction history error:', error)
+      return []
+    }
+  }
+
+  /**
+   * Получает реальный статус транзакции из блокчейна:
+   * confirmations, текущий блок, блок транзакции, статус
+   */
+  async getTransactionStatus(txHash: string): Promise<TransactionStatus> {
+    try {
+      const [receipt, currentBlock] = await Promise.all([
+        this.provider().getTransactionReceipt(txHash),
+        this.provider().getBlockNumber()
+      ])
+
+      if (!receipt) {
+        return {
+          confirmations: 0,
+          currentBlock,
+          txBlock: null,
+          status: 'pending'
+        }
+      }
+
+      const confirmations = currentBlock - receipt.blockNumber + 1
+
+      return {
+        confirmations,
+        currentBlock,
+        txBlock: receipt.blockNumber,
+        status: receipt.status === 1 ? 'confirmed' : 'failed'
+      }
+    } catch (error) {
+      console.error('Get transaction status error:', error)
+      return {
+        confirmations: 0,
+        currentBlock: 0,
+        txBlock: null,
+        status: 'pending'
+      }
     }
   }
 
@@ -491,9 +589,13 @@ export class WalletCore {
 
   /**
    * Очищает данные кошелька (сброс)
+   * Удаляет seed + legacy global transactions + per-wallet transactions
    */
-  async resetWallet(): Promise<void> {
+  async resetWallet(address?: string): Promise<void> {
     await this.store.remove(SEED_KEY)
     await this.store.remove(TRANSACTIONS_KEY)
+    if (address) {
+      await this.store.remove(txKey(address))
+    }
   }
 }
