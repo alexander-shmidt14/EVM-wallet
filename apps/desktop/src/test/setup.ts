@@ -15,6 +15,13 @@ const mockElectronAPI = {
   estimateErc20Gas: jest.fn().mockResolvedValue({ gasPrice: '20000000000', gasLimit: '65000' }),
   getLocalTransactions: jest.fn().mockResolvedValue([]),
   getIncomingTransactions: jest.fn().mockResolvedValue([]),
+  getTransactionHistory: jest.fn().mockResolvedValue([]),
+  getTransactionStatus: jest.fn().mockResolvedValue({
+    confirmations: 12,
+    currentBlock: 18000012,
+    txBlock: 18000000,
+    status: 'confirmed',
+  }),
   resetWallet: jest.fn().mockResolvedValue(undefined),
 }
 

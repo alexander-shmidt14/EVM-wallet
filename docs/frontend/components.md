@@ -7,6 +7,9 @@ related_files:
   - apps/desktop/src/frontend/components/Toast.tsx
   - apps/desktop/src/frontend/components/icons/EthIcon.tsx
   - apps/desktop/src/frontend/components/icons/MmaIcon.tsx
+  - apps/desktop/src/frontend/components/BlockConfirmationBar.tsx
+  - apps/desktop/src/frontend/components/TransactionItem.tsx
+  - apps/desktop/src/frontend/components/TransactionDetailPopup.tsx
 last_updated: 2026-03-02
 ---
 
@@ -44,6 +47,31 @@ import { MmaIcon } from '../components/icons/MmaIcon'
 ```
 
 Используются в [[frontend/screens/wallet|WalletScreen]] для отображения иконок в списке активов.
+
+## История транзакций
+
+| Компонент | Файл | Описание |
+|-----------|------|----------|
+| `BlockConfirmationBar` | `components/BlockConfirmationBar.tsx` | Анимированная полоса подтверждения блоков. Показывает 12 блоков (Ethereum finality standard): зелёные=подтверждено, жёлтые+пульс=текущий, серые=ожидается, красные=ошибка. Props: `confirmations`, `status`, `maxBlocks` |
+| `TransactionItem` | `components/TransactionItem.tsx` | Строка транзакции в списке. Показывает: иконку направления (↑ красная / ↓ зелёная), тип (ETH/ERC-20), адрес контрагента, сумму, относительное время, статус. Props: `tx`, `currentAddress`, `onClick` |
+| `TransactionDetailPopup` | `components/TransactionDetailPopup.tsx` | Full-screen попап с деталями tx: hash, from, to, value, статус, BlockConfirmationBar с real-time поллингом (каждые 5с), кнопка "View on Etherscan". Props: `tx`, `onClose` |
+
+### Использование компонентов истории
+
+```tsx
+import { TransactionItem } from '../components/TransactionItem'
+import { TransactionDetailPopup } from '../components/TransactionDetailPopup'
+import { BlockConfirmationBar } from '../components/BlockConfirmationBar'
+
+// Список транзакций:
+<TransactionItem tx={tx} currentAddress={addr} onClick={() => setSelected(tx)} />
+
+// Попап с деталями:
+<TransactionDetailPopup tx={selectedTx} onClose={() => setSelected(null)} />
+
+// Анимация блоков (используется внутри TransactionDetailPopup):
+<BlockConfirmationBar confirmations={6} status="confirmed" maxBlocks={12} />
+```
 
 ---
 

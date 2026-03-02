@@ -25,9 +25,13 @@ const electronAPI = {
     ipcRenderer.invoke('wallet:estimateErc20Gas', tokenAddress, to, amount),
   
   // Transactions
-  getLocalTransactions: () => ipcRenderer.invoke('wallet:getLocalTransactions'),
+  getLocalTransactions: (address?: string) => ipcRenderer.invoke('wallet:getLocalTransactions', address),
   getIncomingTransactions: (address: string, limit?: number) => 
     ipcRenderer.invoke('wallet:getIncomingTransactions', address, limit),
+  getTransactionHistory: (address: string, limit?: number) =>
+    ipcRenderer.invoke('wallet:getTransactionHistory', address, limit),
+  getTransactionStatus: (txHash: string) =>
+    ipcRenderer.invoke('wallet:getTransactionStatus', txHash),
   
   // Seed phrase
   getSeedPhrase: () => ipcRenderer.invoke('wallet:getSeedPhrase'),
