@@ -3,15 +3,21 @@
 #   - Push to staging or main → builds APK, uploads as artifact
 #   - Tag v* → builds + creates GitHub Release with APK
 #   - Manual dispatch for ad-hoc builds
-name: Android Build
+name: Android Build (DISABLED)
 
+# ⛔ Android pipeline is disabled until we start working on the mobile app.
+# To re-enable: uncomment the push/pull_request triggers below.
 on:
-  push:
-    branches: [staging, main]
-    tags: ["v*"]
-  pull_request:
-    branches: [staging, main]
+  # push:
+  #   branches: [staging, main]
+  #   tags: ["v*"]
+  # pull_request:
+  #   branches: [staging, main]
   workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type 'yes' to confirm manual Android build"
+        required: true
 
 concurrency:
   group: android-${{ github.ref }}

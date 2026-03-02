@@ -1,6 +1,8 @@
 ﻿import React, { useEffect, useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWalletStore } from '../store/wallet'
+import { EthIcon } from '../components/icons/EthIcon'
+import { MmaIcon } from '../components/icons/MmaIcon'
 
 export const WalletScreen: React.FC = () => {
   const navigate = useNavigate()
@@ -142,16 +144,19 @@ export const WalletScreen: React.FC = () => {
       {/* Balance Card */}
       <div className="card text-center mb-8 bg-dark-800 border-dark-600">
         <p className="text-sm text-gray-400 mb-2">Total Balance</p>
+
+        <p className="text-4xl font-bold text-[#f2f2f2]">≈ {'$'}{totalBalanceUsd || '0.00'} USD</p>
+
         <div className="flex items-center justify-center mb-2">
           {ethBalance ? (
-            <span className="text-4xl font-bold text-[#f2f2f2]">{ethBalance} ETH</span>
+            <span className="text-gray-500">{ethBalance} ETH</span>
           ) : isLoading ? (
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
           ) : (
             <span className="text-4xl font-bold text-[#f2f2f2]">0 ETH</span>
           )}
         </div>
-        <p className="text-gray-500">≈ {'$'}{totalBalanceUsd || '0.00'} USD</p>
+        
         
         <button 
           onClick={onRefresh}
@@ -196,8 +201,8 @@ export const WalletScreen: React.FC = () => {
         {/* ETH Asset */}
         <div className="card flex items-center justify-between">
           <div className="flex items-center">
-            <div className="w-10 h-10 bg-dark-500 rounded-full flex items-center justify-center mr-4">
-              <span className="text-white font-bold text-sm">ETH</span>
+            <div className="mr-4">
+              <EthIcon size={40} />
             </div>
             <div>
               <p className="font-medium text-[#f2f2f2]">Ethereum</p>
@@ -215,11 +220,12 @@ export const WalletScreen: React.FC = () => {
         {/* MMA Token Asset */}
         <div className="card flex items-center justify-between mt-2">
           <div className="flex items-center">
-            <div className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center mr-4">
-              <span className="text-white font-bold text-xs">MMA</span>
+            <div className="mr-4">
+              <MmaIcon size={40} />
             </div>
             <div>
-              <p className="font-medium text-[#f2f2f2]">MMA Token</p>
+              {/* MMA Token */}
+              <p className="font-medium text-[#f2f2f2]">MMA Coin</p>
               <p className="text-sm text-gray-500">MMA</p>
             </div>
           </div>
