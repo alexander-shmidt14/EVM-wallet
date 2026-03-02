@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWalletStore } from '../store/wallet'
+import iconApp from '../assets/icon_app.png'
 
 export const LoginScreen: React.FC = () => {
   const navigate = useNavigate()
@@ -37,9 +38,11 @@ export const LoginScreen: React.FC = () => {
     <div className="min-h-screen flex items-center justify-center bg-dark-900 p-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <div className="w-20 h-20 mx-auto mb-6 bg-primary-600 rounded-full flex items-center justify-center">
-            <span className="text-3xl text-white font-bold">EVM</span>
-          </div>
+          <img
+            src={iconApp}
+            alt="EVM Wallet"
+            className="w-20 h-20 mx-auto mb-6 rounded-2xl object-cover"
+          />
           <h1 className="text-3xl font-bold text-[#f2f2f2] mb-3">EVM Wallet</h1>
           <p className="text-gray-400">Enter your password to continue</p>
         </div>
