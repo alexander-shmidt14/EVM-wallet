@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWalletStore } from '../store/wallet'
-import { QRCodeCanvas } from '../../components/QRCode'
+import { QRCodeCanvas } from '../components/QRCode'
 
 const ReceiveScreen: React.FC = () => {
   const navigate = useNavigate()

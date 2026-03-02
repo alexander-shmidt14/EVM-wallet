@@ -3,7 +3,7 @@ module.exports = {
   testEnvironment: 'jsdom',
   setupFilesAfterEnv: ['<rootDir>/src/test/setup.ts'],
   moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/src/renderer/$1',
+    '^@/(.*)$': '<rootDir>/src/frontend/$1',
     '^@wallet/(.*)$': '<rootDir>/../../packages/$1/src',
   },
   transform: {

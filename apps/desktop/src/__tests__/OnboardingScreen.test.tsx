@@ -1,10 +1,10 @@
 import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { OnboardingScreen } from '../renderer/screens/OnboardingScreen'
+import { OnboardingScreen } from '../frontend/screens/OnboardingScreen'
 
 // Mock the wallet store
-jest.mock('../renderer/store/wallet', () => ({
+jest.mock('../frontend/store/wallet', () => ({
   useWalletStore: () => ({
     initialize: jest.fn(),
     isInitialized: true,
