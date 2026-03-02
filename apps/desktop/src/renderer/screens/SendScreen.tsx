@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWalletStore } from '../store/wallet'
+import { walletApi } from '../api/walletApi'
 
 type SendTab = 'eth' | 'erc20'
 
@@ -38,9 +39,9 @@ export const SendScreen: React.FC = () => {
     try {
       let result: any
       if (tab === 'eth') {
-        result = await window.electronAPI.estimateEthGas(recipient, amount)
+        result = await walletApi.estimateEthGas(recipient, amount)
       } else {
-        result = await window.electronAPI.estimateErc20Gas(tokenAddress, recipient, amount)
+        result = await walletApi.estimateErc20Gas(tokenAddress, recipient, amount)
       }
       setGasEstimate(result.totalCostEth)
     } catch (e: any) {
@@ -64,9 +65,9 @@ export const SendScreen: React.FC = () => {
     try {
       let receipt: any
       if (tab === 'eth') {
-        receipt = await window.electronAPI.sendEth(0, recipient, amount)
+        receipt = await walletApi.sendEth(0, recipient, amount)
       } else {
-        receipt = await window.electronAPI.sendErc20(0, tokenAddress, recipient, amount)
+        receipt = await walletApi.sendErc20(0, tokenAddress, recipient, amount)
       }
       if (receipt && receipt.hash) {
         setTxHash(receipt.hash)

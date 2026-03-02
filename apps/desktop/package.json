@@ -7,9 +7,11 @@
   "private": true,
   "scripts": {
     "dev": "concurrently \"npm run build:main\" \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "dev:web": "concurrently \"npm run start:api\" \"vite\"",
     "build": "npm run build:main && npm run build:renderer && electron-builder",
     "build:main": "node esbuild.main.mjs",
     "build:renderer": "vite build",
+    "start:api": "node dist/api-server.js",
     "electron": "electron .",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",

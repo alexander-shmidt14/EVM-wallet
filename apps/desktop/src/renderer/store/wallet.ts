@@ -1,42 +1,5 @@
-﻿import { create } from 'zustand'
-
-interface ElectronAPI {
-  // Auth
-  hasPassword: () => Promise<boolean>
-  setPassword: (password: string) => Promise<void>
-  checkPassword: (password: string) => Promise<boolean>
-
-  // Multi-wallet
-  listWallets: () => Promise<Array<{ id: string; name: string; address: string; createdAt: number }>>
-  createNewWallet: (name: string) => Promise<{ id: string; name: string; address: string; seedPhrase: string }>
-  importNewWallet: (name: string, seedPhrase: string) => Promise<{ id: string; name: string; address: string }>
-  selectWallet: (walletId: string) => Promise<{ id: string; name: string; address: string }>
-  deleteWallet: (walletId: string) => Promise<void>
-  getActiveWalletId: () => Promise<string | null>
-
-  // Wallet operations
-  hasWallet: () => Promise<boolean>
-  createWallet: () => Promise<string>
-  importWallet: (seedPhrase: string) => Promise<void>
-  getAddress: (index?: number) => Promise<string>
-  getEthBalance: (address: string) => Promise<any>
-  sendEth: (accountIndex: number, to: string, amount: string) => Promise<any>
-  getErc20Meta: (tokenAddress: string) => Promise<any>
-  getErc20Balance: (tokenAddress: string, holderAddress: string) => Promise<any>
-  sendErc20: (accountIndex: number, tokenAddress: string, to: string, amount: string) => Promise<any>
-  estimateEthGas: (to: string, amount: string) => Promise<any>
-  estimateErc20Gas: (tokenAddress: string, to: string, amount: string) => Promise<any>
-  getLocalTransactions: () => Promise<any[]>
-  getIncomingTransactions: (address: string, limit?: number) => Promise<any[]>
-  getSeedPhrase: () => Promise<string>
-  resetWallet: () => Promise<void>
-}
-
-declare global {
-  interface Window {
-    electronAPI: ElectronAPI
-  }
-}
+import { create } from 'zustand'
+import { walletApi } from '../api/walletApi'
 
 const MMA_TOKEN_ADDRESS = '0xcA82d24A97b33F2d5826575f77fdc8Bdb82FC580'
 const MMA_PRICE_USD = 55
@@ -113,7 +76,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   // ─── Auth actions ──────────────────────────
   checkAuth: async () => {
     try {
-      const hasPassword = await window.electronAPI.hasPassword()
+      const hasPassword = await walletApi.hasPassword()
       set({ hasPassword, isInitialized: true })
     } catch (error) {
       set({ hasPassword: false, isInitialized: true })
@@ -121,12 +84,12 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   },
 
   setPassword: async (password: string) => {
-    await window.electronAPI.setPassword(password)
+    await walletApi.setPassword(password)
     set({ hasPassword: true, isAuthenticated: true })
   },
 
   login: async (password: string) => {
-    const valid = await window.electronAPI.checkPassword(password)
+    const valid = await walletApi.checkPassword(password)
     if (valid) {
       set({ isAuthenticated: true })
     }
@@ -148,8 +111,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   // ─── Multi-wallet actions ──────────────────
   loadWalletList: async () => {
     try {
-      const wallets = await window.electronAPI.listWallets()
-      const activeId = await window.electronAPI.getActiveWalletId()
+      const wallets = await walletApi.listWallets()
+      const activeId = await walletApi.getActiveWalletId()
       set({ walletList: wallets, activeWalletId: activeId })
     } catch (error) {
       console.error('Failed to load wallet list:', error)
@@ -159,7 +122,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   createNewWallet: async (name: string) => {
     try {
       set({ isLoading: true, error: null })
-      const result = await window.electronAPI.createNewWallet(name)
+      const result = await walletApi.createNewWallet(name)
 
       set({
         hasWallet: true,
@@ -185,7 +148,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   importNewWallet: async (name: string, seedPhrase: string) => {
     try {
       set({ isLoading: true, error: null })
-      const result = await window.electronAPI.importNewWallet(name, seedPhrase)
+      const result = await walletApi.importNewWallet(name, seedPhrase)
 
       set({
         hasWallet: true,
@@ -209,7 +172,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   selectWallet: async (walletId: string) => {
     try {
       set({ isLoading: true, error: null })
-      const result = await window.electronAPI.selectWallet(walletId)
+      const result = await walletApi.selectWallet(walletId)
 
       set({
         hasWallet: true,
@@ -235,7 +198,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
 
   deleteWallet: async (walletId: string) => {
     try {
-      await window.electronAPI.deleteWallet(walletId)
+      await walletApi.deleteWallet(walletId)
       const { activeWalletId } = get()
 
       if (activeWalletId === walletId) {
@@ -262,15 +225,15 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     try {
       set({ isLoading: true, error: null })
 
-      const hasPassword = await window.electronAPI.hasPassword()
+      const hasPassword = await walletApi.hasPassword()
       set({ hasPassword })
 
-      const hasWallet = await window.electronAPI.hasWallet()
+      const hasWallet = await walletApi.hasWallet()
 
       if (hasWallet) {
-        const address = await window.electronAPI.getAddress(0)
-        const activeId = await window.electronAPI.getActiveWalletId()
-        const wallets = await window.electronAPI.listWallets()
+        const address = await walletApi.getAddress(0)
+        const activeId = await walletApi.getActiveWalletId()
+        const wallets = await walletApi.listWallets()
         const activeWallet = wallets.find((w: any) => w.id === activeId)
 
         set({
@@ -285,7 +248,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
 
         get().loadBalance()
       } else {
-        const wallets = await window.electronAPI.listWallets()
+        const wallets = await walletApi.listWallets()
         set({
           hasWallet: false,
           walletList: wallets,
@@ -307,7 +270,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       const { currentAddress } = get()
       if (!currentAddress) return
 
-      const balance = await window.electronAPI.getEthBalance(currentAddress)
+      const balance = await walletApi.getEthBalance(currentAddress)
       set({ ethBalance: balance.formatted })
 
       // Fetch ETH price
@@ -323,7 +286,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
 
       let mmaUsdNum = 0
       try {
-        const mmaBalance = await window.electronAPI.getErc20Balance(MMA_TOKEN_ADDRESS, currentAddress)
+        const mmaBalance = await walletApi.getErc20Balance(MMA_TOKEN_ADDRESS, currentAddress)
         const mmaFormatted = parseFloat(mmaBalance.formatted).toFixed(4)
         const mmaUsd = (parseFloat(mmaBalance.formatted) * MMA_PRICE_USD).toFixed(2)
         mmaUsdNum = parseFloat(mmaUsd)
@@ -345,7 +308,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
 
   loadSeedPhrase: async () => {
     try {
-      const phrase = await window.electronAPI.getSeedPhrase()
+      const phrase = await walletApi.getSeedPhrase()
       set({ seedPhrase: phrase })
     } catch (e) {
       console.error('Failed to load seed phrase:', e)
@@ -354,7 +317,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
 
   reset: async () => {
     try {
-      await window.electronAPI.resetWallet()
+      await walletApi.resetWallet()
       set({
         hasWallet: false,
         currentAddress: null,

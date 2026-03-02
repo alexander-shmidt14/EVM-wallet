@@ -41,4 +41,11 @@ await build({
   outfile: resolve(__dirname, 'dist/preload.js'),
 })
 
-console.log('✅ Main process and preload bundled successfully')
+// Build standalone API server (no Electron dependency)
+await build({
+  ...commonOptions,
+  entryPoints: [resolve(__dirname, 'src/api-server.ts')],
+  outfile: resolve(__dirname, 'dist/api-server.js'),
+})
+
+console.log('✅ Main process, preload, and standalone API server bundled successfully')

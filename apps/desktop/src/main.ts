@@ -3,6 +3,7 @@ import { join } from 'path'
 import { createHash } from 'crypto'
 import { WalletCore } from '@wallet/wallet-core'
 import { secureStore } from './secure-store'
+import { startHttpApiServer } from './http-api'
 
 // Keep a global reference of the window object
 let mainWindow: BrowserWindow | null = null
@@ -54,6 +55,9 @@ const createWindow = (): void => {
 // App event listeners
 app.whenReady().then(() => {
   initWalletCore()
+  // Start the HTTP API server so the renderer can also connect via HTTP
+  // (e.g. when opened in a browser during web development)
+  startHttpApiServer(secureStore, () => walletCore)
   createWindow()
 
   app.on('activate', () => {

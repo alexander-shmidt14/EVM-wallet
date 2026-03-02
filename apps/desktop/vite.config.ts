@@ -48,4 +48,10 @@ export default defineConfig({
   css: {
     postcss: './postcss.config.js',
   },
+  // Allow the dev server to accept connections on localhost so it can
+  // be opened in a browser while the API server runs on the same machine.
+  server: {
+    host: '127.0.0.1',
+    port: 5173,
+  },
 })
