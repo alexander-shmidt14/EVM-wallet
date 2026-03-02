@@ -53,7 +53,7 @@ const mockErc20Tx: TransactionInfo = {
   value: '100',
   type: 'erc20',
   tokenSymbol: 'MMA',
-  tokenAddress: '0xC0bB99E7B5A1fe73A1c9B7F7E2376e70c6F7881F',
+  tokenAddress: '0xcA82d24A97b33F2d5826575f77fdc8Bdb82FC580',
   status: 'confirmed',
   timestamp: Date.now() - 7200000,
   direction: 'out',

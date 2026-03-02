@@ -4,7 +4,7 @@ import { useWalletStore } from '../store/wallet'
 
 type SendTab = 'eth' | 'erc20'
 
-const MMA_TOKEN_ADDRESS = '0xC0bB99E7B5A1fe73A1c9B7F7E2376e70c6F7881F'
+const MMA_TOKEN_ADDRESS = '0xcA82d24A97b33F2d5826575f77fdc8Bdb82FC580'
 
 export const SendScreen: React.FC = () => {
   const navigate = useNavigate()
