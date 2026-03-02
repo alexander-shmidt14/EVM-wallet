@@ -1,0 +1,13 @@
+rootProject.name = 'SmartWallet'
+
+def generators = new File(rootDir, "../../../node_modules/.pnpm/@react-native-community+cli-platform-android@13.6.4/node_modules/@react-native-community/cli-platform-android/native_modules.gradle")
+if (generators.exists()) {
+    apply from: generators; applyNativeModulesSettingsGradle(settings)
+}
+
+include ':app'
+
+def gradlePluginDir = new File(rootDir, "../../../node_modules/.pnpm/@react-native+gradle-plugin@0.74.81/node_modules/@react-native/gradle-plugin")
+if (gradlePluginDir.exists()) {
+    includeBuild(gradlePluginDir)
+}

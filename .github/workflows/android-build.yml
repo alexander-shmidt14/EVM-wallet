@@ -1,0 +1,72 @@
+# ─── Build & Release: Android APK ───────────────────────────────────
+# Builds Android APK on push to staging/main or tag
+name: Android Build
+
+on:
+  push:
+    branches: [staging, main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build wallet-core
+        run: pnpm -F @wallet/wallet-core build
+
+      - name: Build ui-tokens
+        run: pnpm -F @wallet/ui-tokens build
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Make gradlew executable
+        run: chmod +x apps/mobile/android/gradlew
+
+      - name: Build Android APK
+        run: cd apps/mobile/android && ./gradlew assembleRelease
+
+      - name: Generate checksum
+        run: |
+          cd apps/mobile/android/app/build/outputs/apk/release
+          sha256sum *.apk > checksums.txt
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk-${{ github.sha }}
+          path: |
+            apps/mobile/android/app/build/outputs/apk/release/*.apk
+            apps/mobile/android/app/build/outputs/apk/release/checksums.txt
+          retention-days: 30
+
+      - name: Upload to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            apps/mobile/android/app/build/outputs/apk/release/*.apk
+            apps/mobile/android/app/build/outputs/apk/release/checksums.txt

@@ -1,0 +1,62 @@
+# ─── Dependencies ────────────────────────────────
+node_modules/
+.pnp.*
+.yarn/
+
+# ─── Build outputs ──────────────────────────────
+dist/
+build/
+out/
+*.tgz
+
+# ─── Electron / Desktop ─────────────────────────
+apps/desktop/release/win-unpacked/
+apps/desktop/release/*.exe
+apps/desktop/release/*.7z
+apps/desktop/release/builder-*.yml
+apps/desktop/release/builder-*.yaml
+apps/desktop/release/icon.ico
+apps/desktop/dist/
+
+# ─── Android ────────────────────────────────────
+apps/mobile/android/.gradle/
+apps/mobile/android/app/build/
+apps/mobile/android/local.properties
+*.hprof
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# ─── Environment ────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ─── IDE / Editor ───────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ─── OS ─────────────────────────────────────────
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# ─── Logs ───────────────────────────────────────
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# ─── Test / Coverage ────────────────────────────
+coverage/
+*.lcov
+.nyc_output
+
+# ─── Misc ───────────────────────────────────────
+.cache
+.eslintcache
+.npm

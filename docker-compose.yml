@@ -1,0 +1,74 @@
+# EVM Wallet — Development Environment
+# Usage: docker compose up dev
+
+services:
+  # ── Development (watch mode for packages + Vite HMR) ──────────────
+  dev:
+    build:
+      context: .
+      target: dev
+    volumes:
+      # Mount source for live editing — but keep node_modules from container
+      - .:/workspace
+      - /workspace/node_modules
+      - /workspace/packages/wallet-core/node_modules
+      - /workspace/packages/ui-tokens/node_modules
+      - /workspace/apps/desktop/node_modules
+      - /workspace/apps/mobile/node_modules
+    ports:
+      - "5173:5173"          # Vite dev server
+    environment:
+      - NODE_ENV=development
+    env_file:
+      - .env
+    command: >
+      sh -c "
+        pnpm -F @wallet/wallet-core build &&
+        pnpm -F @wallet/ui-tokens build &&
+        echo '✅ Packages built. Starting Vite dev server...' &&
+        pnpm -F @app/desktop build:main &&
+        cd apps/desktop && pnpm exec vite --host 0.0.0.0
+      "
+
+  # ── Run tests ─────────────────────────────────────────────────────
+  test:
+    build:
+      context: .
+      target: test
+    volumes:
+      - .:/workspace
+      - /workspace/node_modules
+    environment:
+      - NODE_ENV=test
+      - CI=true
+    command: >
+      sh -c "
+        pnpm -F @wallet/wallet-core build &&
+        pnpm -F @wallet/ui-tokens build &&
+        pnpm -F @app/desktop test -- --passWithNoTests --ci &&
+        pnpm -F @wallet/wallet-core typecheck &&
+        pnpm -F @app/desktop typecheck
+      "
+
+  # ── Typecheck all packages ────────────────────────────────────────
+  typecheck:
+    build:
+      context: .
+      target: test
+    volumes:
+      - .:/workspace
+      - /workspace/node_modules
+    command: >
+      sh -c "
+        pnpm -F @wallet/wallet-core build &&
+        pnpm -F @wallet/ui-tokens build &&
+        pnpm -r run typecheck
+      "
+
+  # ── Build renderer (for CI/pre-commit validation) ─────────────────
+  build:
+    build:
+      context: .
+      target: build
+    volumes:
+      - ./apps/desktop/dist:/workspace/apps/desktop/dist

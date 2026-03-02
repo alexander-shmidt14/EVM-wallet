@@ -1,0 +1,84 @@
+# ─── Build & Release: Windows Desktop ───────────────────────────────
+# Builds Windows EXE on push to staging/main or tag
+name: Windows Build
+
+on:
+  push:
+    branches: [staging, main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: win-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build wallet-core
+        run: pnpm -F @wallet/wallet-core build
+
+      - name: Build ui-tokens
+        run: pnpm -F @wallet/ui-tokens build
+
+      - name: Build desktop main + renderer
+        run: |
+          pnpm -F @app/desktop build:main
+          pnpm -F @app/desktop build:renderer
+        env:
+          NODE_ENV: production
+
+      - name: Package Windows (dir)
+        run: |
+          cd apps/desktop
+          npx electron-builder --win --dir --x64
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      - name: Build NSIS installer
+        run: |
+          Copy-Item "apps\desktop\assets\icon.ico" "apps\desktop\release\icon.ico" -Force
+          $nsis = Get-ChildItem "$env:LOCALAPPDATA\electron-builder\Cache\nsis" -Recurse -Filter "makensis.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($nsis) { & $nsis.FullName "apps\desktop\release\installer.nsi" }
+          else { Write-Host "NSIS not found, skipping installer" }
+        shell: powershell
+        continue-on-error: true
+
+      - name: Generate checksums
+        run: |
+          cd apps/desktop/release
+          Get-ChildItem *.exe -ErrorAction SilentlyContinue |
+            ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash)  $($_.Name)" } > checksums.txt
+        shell: powershell
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-desktop-${{ github.sha }}
+          path: |
+            apps/desktop/release/*.exe
+            apps/desktop/release/checksums.txt
+          retention-days: 30
+
+      - name: Upload to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            apps/desktop/release/*.exe
+            apps/desktop/release/checksums.txt

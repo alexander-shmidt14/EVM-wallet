@@ -1,0 +1,157 @@
+# ─── CI: Lint, Typecheck, Test ──────────────────────────────────────
+# Runs on EVERY push and PR to dev / staging / main
+name: CI
+
+on:
+  push:
+    branches: [dev, staging, main]
+  pull_request:
+    branches: [dev, staging, main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Install & Cache ───────────────────────────────────────────────
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - uses: actions/cache/save@v4
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+            apps/*/node_modules
+          key: deps-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+  # ── Build shared packages ─────────────────────────────────────────
+  build-packages:
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+            apps/*/node_modules
+          key: deps-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Build wallet-core
+        run: pnpm -F @wallet/wallet-core build
+      - name: Build ui-tokens
+        run: pnpm -F @wallet/ui-tokens build
+
+      - uses: actions/cache/save@v4
+        with:
+          path: |
+            packages/wallet-core/dist
+            packages/ui-tokens/dist
+          key: packages-${{ github.sha }}
+
+  # ── Typecheck ─────────────────────────────────────────────────────
+  typecheck:
+    needs: build-packages
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package:
+          - "@wallet/wallet-core"
+          - "@app/desktop"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+            apps/*/node_modules
+          key: deps-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            packages/wallet-core/dist
+            packages/ui-tokens/dist
+          key: packages-${{ github.sha }}
+
+      - name: Typecheck ${{ matrix.package }}
+        run: pnpm -F "${{ matrix.package }}" typecheck
+
+  # ── Unit Tests ────────────────────────────────────────────────────
+  test:
+    needs: build-packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+            apps/*/node_modules
+          key: deps-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            packages/wallet-core/dist
+            packages/ui-tokens/dist
+          key: packages-${{ github.sha }}
+
+      - name: Run desktop tests
+        run: pnpm -F @app/desktop test -- --passWithNoTests --ci
+
+  # ── Build validation (renderer compiles) ──────────────────────────
+  build-check:
+    needs: build-packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+            apps/*/node_modules
+          key: deps-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            packages/wallet-core/dist
+            packages/ui-tokens/dist
+          key: packages-${{ github.sha }}
+
+      - name: Build main process
+        run: pnpm -F @app/desktop build:main
+      - name: Build renderer
+        run: pnpm -F @app/desktop build:renderer

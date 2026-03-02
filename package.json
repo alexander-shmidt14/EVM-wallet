@@ -1,0 +1,26 @@
+{
+  "name": "evm-wallet",
+  "private": true,
+  "packageManager": "pnpm@9.6.0",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "build": "pnpm -r run build",
+    "dev": "pnpm -r --parallel run dev",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -F @app/desktop test -- --passWithNoTests",
+    "test:ci": "pnpm -F @app/desktop test -- --passWithNoTests --ci",
+    "desktop:dev": "pnpm -F @app/desktop dev",
+    "desktop:build": "pnpm -F @app/desktop build:main && pnpm -F @app/desktop build:renderer",
+    "desktop:package": "cd apps/desktop && npx electron-builder --win --dir --x64",
+    "mobile:android": "pnpm -F @app/mobile android",
+    "mobile:dev": "pnpm -F @app/mobile dev",
+    "clean": "pnpm -r run clean",
+    "docker:dev": "docker compose up dev",
+    "docker:test": "docker compose run --rm test",
+    "docker:build": "docker compose run --rm build"
+  },
+  "devDependencies": {
+    "typescript": "^5.2.2",
+    "@types/node": "^20.8.0"
+  }
+}

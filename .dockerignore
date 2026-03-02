@@ -1,0 +1,15 @@
+node_modules
+**/node_modules
+**/dist
+**/build
+**/release/win-unpacked
+**/release/*.exe
+**/release/*.7z
+**/.gradle
+**/android/app/build
+*.hprof
+.git
+.vscode
+.env
+.DS_Store
+*.log
