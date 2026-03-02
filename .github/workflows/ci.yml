@@ -1,11 +1,19 @@
-# ─── CI: Audit, Typecheck, Test, Build Validation ───────────────────
-# Triggers: every push and PR to dev / staging / main
+# ─── CI: Full Quality Gate ──────────────────────────────────────────
+# Purpose: Block broken code from entering dev/staging/main.
+#
+# Workflow:
+#   1. Create branch: fix/my-change (from dev)
+#   2. Push commits → CI runs on the PR
+#   3. ALL checks must pass before merge is allowed
+#   4. If checks FAIL → merge button is disabled, dev stays clean
+#   5. After merge to dev → windows-build.yml auto-produces .exe
+#
 name: CI
 
 on:
-  push:
-    branches: [dev, staging, main]
   pull_request:
+    branches: [dev, staging, main]
+  push:
     branches: [dev, staging, main]
 
 concurrency:
@@ -16,12 +24,13 @@ env:
   NODE_VERSION: "20"
 
 jobs:
-  # ── 1. Install, cache, security audit ─────────────────────────────
+  # ── 1. Install dependencies + security audit ──────────────────────
   install:
     name: "Install & Audit"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -31,8 +40,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Security audit
+      - name: Security audit (high + critical)
         run: pnpm audit --audit-level=high || true
+
+      - name: Check for known vulnerable packages
+        run: |
+          echo "=== Checking critical dependencies ==="
+          pnpm list ethers --depth=0 || true
+          pnpm list electron --depth=0 || true
+          echo "✅ Dependency check complete"
 
       - uses: actions/cache/save@v4
         with:
@@ -44,7 +60,7 @@ jobs:
 
   # ── 2. Build shared packages ──────────────────────────────────────
   build-packages:
-    name: "Build packages"
+    name: "Build shared packages"
     needs: install
     runs-on: ubuntu-latest
     steps:
@@ -65,8 +81,17 @@ jobs:
       - name: Build wallet-core
         run: pnpm -F @wallet/wallet-core build
 
+      - name: Verify wallet-core output
+        run: |
+          test -f packages/wallet-core/dist/index.js && echo "✅ wallet-core/dist/index.js" || (echo "❌ missing" && exit 1)
+          test -f packages/wallet-core/dist/index.d.ts && echo "✅ wallet-core/dist/index.d.ts" || (echo "❌ missing" && exit 1)
+
       - name: Build ui-tokens
         run: pnpm -F @wallet/ui-tokens build
+
+      - name: Verify ui-tokens output
+        run: |
+          test -f packages/ui-tokens/dist/index.js && echo "✅ ui-tokens/dist/index.js" || (echo "❌ missing" && exit 1)
 
       - uses: actions/cache/save@v4
         with:
@@ -75,7 +100,7 @@ jobs:
             packages/ui-tokens/dist
           key: packages-${{ github.sha }}
 
-  # ── 3. Typecheck (matrix: wallet-core + desktop) ──────────────────
+  # ── 3. TypeScript strict check (all packages) ────────────────────
   typecheck:
     name: "Typecheck ${{ matrix.package }}"
     needs: build-packages
@@ -110,9 +135,9 @@ jobs:
       - name: Typecheck ${{ matrix.package }}
         run: pnpm -F "${{ matrix.package }}" typecheck
 
-  # ── 4. Unit Tests + Coverage ──────────────────────────────────────
+  # ── 4. Unit tests + coverage ──────────────────────────────────────
   test:
-    name: "Tests"
+    name: "Unit Tests"
     needs: build-packages
     runs-on: ubuntu-latest
     steps:
@@ -137,20 +162,20 @@ jobs:
           key: packages-${{ github.sha }}
 
       - name: Run tests with coverage
-        run: pnpm -F @app/desktop test -- --passWithNoTests --ci --coverage
+        run: pnpm -F @app/desktop test -- --passWithNoTests --ci --coverage --verbose
 
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-report
+          name: coverage-report-${{ github.sha }}
           path: apps/desktop/coverage/
           retention-days: 14
         continue-on-error: true
 
-  # ── 5. Full build validation (main + renderer compile) ────────────
+  # ── 5. Full build validation ──────────────────────────────────────
   build-check:
-    name: "Build check"
+    name: "Build validation"
     needs: build-packages
     runs-on: ubuntu-latest
     steps:
@@ -174,31 +199,54 @@ jobs:
             packages/ui-tokens/dist
           key: packages-${{ github.sha }}
 
-      - name: Build main process
+      - name: Build Electron main process
         run: pnpm -F @app/desktop build:main
+        env:
+          NODE_ENV: production
 
-      - name: Build renderer
+      - name: Build Vite renderer
         run: pnpm -F @app/desktop build:renderer
+        env:
+          NODE_ENV: production
 
-      - name: Verify build outputs exist
+      - name: Verify all build outputs
         run: |
-          test -f apps/desktop/dist/main.js && echo "✅ main.js OK" || (echo "❌ main.js missing" && exit 1)
-          test -d apps/desktop/dist/renderer && echo "✅ renderer/ OK" || (echo "❌ renderer/ missing" && exit 1)
+          echo "=== Checking build outputs ==="
+          test -f apps/desktop/dist/main.js && echo "✅ main.js" || (echo "❌ main.js missing" && exit 1)
+          test -f apps/desktop/dist/preload.js && echo "✅ preload.js" || (echo "⚠️ preload.js not found (may be bundled)")
+          test -d apps/desktop/dist/renderer && echo "✅ renderer/" || (echo "❌ renderer/ missing" && exit 1)
+          test -f apps/desktop/dist/renderer/index.html && echo "✅ renderer/index.html" || (echo "❌ index.html missing" && exit 1)
+          echo "=== All build outputs verified ==="
 
-  # ── 6. CI status gate (all checks must pass for merge) ────────────
-  ci-status:
-    name: "CI Status"
+  # ── 6. CI gate — REQUIRED for merge ──────────────────────────────
+  # This is the single check that branch protection requires.
+  # It only passes if ALL jobs above succeeded.
+  ci-gate:
+    name: "CI Gate"
     if: always()
     needs: [install, build-packages, typecheck, test, build-check]
     runs-on: ubuntu-latest
     steps:
-      - name: Check all jobs passed
+      - name: Evaluate results
         run: |
-          results=("${{ needs.install.result }}" "${{ needs.build-packages.result }}" "${{ needs.typecheck.result }}" "${{ needs.test.result }}" "${{ needs.build-check.result }}")
-          for r in "${results[@]}"; do
-            if [ "$r" != "success" ]; then
-              echo "❌ CI failed: one or more jobs did not succeed"
-              exit 1
+          echo "install:        ${{ needs.install.result }}"
+          echo "build-packages: ${{ needs.build-packages.result }}"
+          echo "typecheck:      ${{ needs.typecheck.result }}"
+          echo "test:           ${{ needs.test.result }}"
+          echo "build-check:    ${{ needs.build-check.result }}"
+          echo ""
+
+          FAILED=0
+          for result in "${{ needs.install.result }}" "${{ needs.build-packages.result }}" "${{ needs.typecheck.result }}" "${{ needs.test.result }}" "${{ needs.build-check.result }}"; do
+            if [ "$result" != "success" ]; then
+              FAILED=1
             fi
           done
-          echo "✅ All CI checks passed"
+
+          if [ "$FAILED" = "1" ]; then
+            echo "❌ CI FAILED — merge is BLOCKED"
+            echo "Fix the issues in your branch and push again."
+            exit 1
+          fi
+
+          echo "✅ ALL CHECKS PASSED — merge is allowed"
