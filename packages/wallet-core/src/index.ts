@@ -1,7 +1,8 @@
-import { JsonRpcProvider, HDNodeWallet, Contract, formatEther, parseUnits, getAddress, TransactionReceipt, TransactionRequest } from 'ethers'
+import { JsonRpcProvider, HDNodeWallet, Contract, formatEther, formatUnits, parseUnits, getAddress, TransactionReceipt, TransactionRequest } from 'ethers'
 import type { SecureStore } from './secure-store'
 import erc20Abi from './erc20.abi.json'
 import 'cross-fetch/polyfill'
+import { MMA_TOKEN_ADDRESS } from './meta'
 
 // Re-export types
 export type { SecureStore } from './secure-store'
@@ -65,6 +66,7 @@ export interface TransactionInfo {
   blockNumber?: number
   direction?: 'in' | 'out'
   confirmations?: number
+  logIndex?: number
 }
 
 export interface TransactionStatus {
@@ -76,12 +78,34 @@ export interface TransactionStatus {
 
 export class WalletCore {
   private _provider: JsonRpcProvider | null = null
+  private incomingTokenWhitelist: Set<string>
 
   constructor(
     private rpcUrl: string, 
     private store: SecureStore,
-    private etherscanApiKey?: string
-  ) {}
+    private etherscanApiKey?: string,
+    incomingTokenWhitelist: string[] = [MMA_TOKEN_ADDRESS]
+  ) {
+    this.incomingTokenWhitelist = new Set(
+      incomingTokenWhitelist
+        .map((address) => address.toLowerCase().trim())
+        .filter(Boolean)
+    )
+  }
+
+  private txDedupKey(tx: TransactionInfo): string {
+    if (tx.type === 'erc20') {
+      return [
+        tx.hash,
+        tx.tokenAddress?.toLowerCase() || '',
+        tx.from.toLowerCase(),
+        tx.to.toLowerCase(),
+        tx.value,
+        String(tx.logIndex ?? ''),
+      ].join(':')
+    }
+    return tx.hash.toLowerCase()
+  }
 
   private provider(): JsonRpcProvider {
     if (!this._provider) {
@@ -496,13 +520,14 @@ export class WalletCore {
       const incoming = await this.getIncomingTransactions(address, limit)
       const incomingWithDir = incoming.map(tx => ({ ...tx, direction: 'in' as const }))
 
-      // 3. Merge + deduplicate by hash
+      // 3. Merge + deduplicate
       const seen = new Set<string>()
       const merged: TransactionInfo[] = []
 
       for (const tx of [...localWithDir, ...incomingWithDir]) {
-        if (!seen.has(tx.hash)) {
-          seen.add(tx.hash)
+        const key = this.txDedupKey(tx)
+        if (!seen.has(key)) {
+          seen.add(key)
           merged.push(tx)
         }
       }
@@ -561,20 +586,26 @@ export class WalletCore {
    */
   async getIncomingTransactions(address: string, limit = 50): Promise<TransactionInfo[]> {
     if (!this.etherscanApiKey) {
+      console.warn('ETHERSCAN_API_KEY is not set; incoming transactions are disabled')
       return []
     }
 
     try {
-      const url = `https://api.etherscan.io/api?module=account&action=txlist&address=${address}&startblock=0&endblock=99999999&page=1&offset=${limit}&sort=desc&apikey=${this.etherscanApiKey}`
-      
-      const response = await fetch(url)
-      const data = await response.json()
-      
-      if (data.status !== '1' || !Array.isArray(data.result)) {
-        return []
-      }
+      const normalizedAddress = address.toLowerCase()
+      const baseUrl = 'https://api.etherscan.io/api?module=account&address=' + address + '&startblock=0&endblock=99999999&page=1&offset=' + limit + '&sort=desc&apikey=' + this.etherscanApiKey
 
-      return data.result
+      const [ethResponse, erc20Response] = await Promise.all([
+        fetch(baseUrl + '&action=txlist'),
+        fetch(baseUrl + '&action=tokentx'),
+      ])
+
+      const [ethData, erc20Data] = await Promise.all([
+        ethResponse.json(),
+        erc20Response.json(),
+      ])
+
+      const incomingEth: TransactionInfo[] = Array.isArray(ethData?.result)
+        ? ethData.result
         .filter((tx: any) => tx.to?.toLowerCase() === address.toLowerCase())
         .map((tx: any): TransactionInfo => ({
           hash: tx.hash,
@@ -587,6 +618,38 @@ export class WalletCore {
           blockNumber: parseInt(tx.blockNumber),
           direction: 'in'
         }))
+        : []
+
+      const incomingErc20: TransactionInfo[] = Array.isArray(erc20Data?.result)
+        ? erc20Data.result
+          .filter((tx: any) => tx.to?.toLowerCase() === normalizedAddress)
+          .filter((tx: any) => {
+            const tokenAddress = String(tx.contractAddress || '').toLowerCase()
+            return tokenAddress && this.incomingTokenWhitelist.has(tokenAddress)
+          })
+          .map((tx: any): TransactionInfo => {
+            const tokenDecimals = Number(tx.tokenDecimal || 18)
+            const safeDecimals = Number.isFinite(tokenDecimals) ? tokenDecimals : 18
+
+            return {
+              hash: tx.hash,
+              from: tx.from,
+              to: tx.to,
+              value: formatUnits(tx.value || '0', safeDecimals),
+              type: 'erc20',
+              tokenAddress: tx.contractAddress,
+              tokenSymbol: tx.tokenSymbol,
+              tokenDecimals: safeDecimals,
+              timestamp: parseInt(tx.timeStamp) * 1000,
+              status: tx.txreceipt_status === '0' ? 'failed' : 'confirmed',
+              blockNumber: parseInt(tx.blockNumber),
+              direction: 'in',
+              logIndex: Number(tx.logIndex),
+            }
+          })
+        : []
+
+      return [...incomingEth, ...incomingErc20]
     } catch (error) {
       console.error('Get incoming transactions error:', error)
       return []

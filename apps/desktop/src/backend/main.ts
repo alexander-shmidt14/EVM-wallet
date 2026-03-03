@@ -19,7 +19,17 @@ const ACTIVE_WALLET_KEY = 'active_wallet_id'
 const initWalletCore = () => {
   const rpcUrl = process.env.ALCHEMY_RPC_MAINNET || process.env.INFURA_RPC_MAINNET || 'https://ethereum.publicnode.com'
   const etherscanApiKey = process.env.ETHERSCAN_API_KEY
-  walletCore = new WalletCore(rpcUrl, secureStore, etherscanApiKey)
+  const incomingTokenWhitelist = (process.env.INCOMING_ERC20_WHITELIST || '')
+    .split(',')
+    .map((address) => address.trim())
+    .filter(Boolean)
+
+  walletCore = new WalletCore(
+    rpcUrl,
+    secureStore,
+    etherscanApiKey,
+    incomingTokenWhitelist.length > 0 ? incomingTokenWhitelist : undefined
+  )
 }
 
 const createWindow = (): void => {

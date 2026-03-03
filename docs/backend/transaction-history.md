@@ -16,7 +16,7 @@ last_updated: 2026-03-03
 
 ## Обзор
 
-Компонент **WalletScreen** отображает историю транзакций: как исходящие (локальные), так и **входящие** (из блокчейна). Входящие транзакции загружаются через **Etherscan API**.
+Компонент **WalletScreen** отображает историю транзакций: как исходящие (локальные), так и **входящие** (из блокчейна). Входящие транзакции загружаются через **Etherscan API** (`txlist` для ETH и `tokentx` для ERC-20).
 
 ---
 
@@ -120,11 +120,13 @@ async getTransactionHistory(address: string, limit = 50): Promise<TransactionInf
   const local = await this.getLocalTransactions(address)
   const localWithDir = local.map(tx => ({ ...tx, direction: (tx.direction || 'out') as 'in' | 'out' }))
 
-  // 2. Получаем входящие через Etherscan
+  // 2. Получаем входящие через Etherscan:
+  //    - ETH: action=txlist
+  //    - ERC-20: action=tokentx (через whitelist)
   const incoming = await this.getIncomingTransactions(address, limit)
   const incomingWithDir = incoming.map(tx => ({ ...tx, direction: 'in' as const }))
 
-  // 3. Merge + deduplicate by hash
+  // 3. Merge + deduplicate by stable key (hash + token/log details for ERC-20)
   const seen = new Set<string>()
   const merged: TransactionInfo[] = []
 
@@ -161,7 +163,10 @@ interface Response {
 
 - ⚠️ **`ETHERSCAN_API_KEY` обязателен** — без него возвращает `[]`
 - Фильтрует только транзакции где `to === address`
-- Поддерживает только **ETH** (не ERC-20 за счёт ограничений Etherscan)
+- Поддерживает **ETH + ERC-20 incoming**:
+  - ETH через `action=txlist`
+  - ERC-20 через `action=tokentx`
+- ERC-20 ограничены whitelist (`INCOMING_ERC20_WHITELIST`), по умолчанию — MMA token
 
 ```typescript
 async getIncomingTransactions(address: string, limit = 50): Promise<TransactionInfo[]> {
@@ -215,10 +220,11 @@ async getIncomingTransactions(address: string, limit = 50): Promise<TransactionI
 
 1. Перейти на https://etherscan.io/apis
 2. Создать аккаунт и создать новый API ключ
-3. Добавить в `.env`:
+3. Добавить в `.env` (локальная разработка) или в GitHub Actions Secrets (для CI installer):
 
 ```env
-ETHERSCAN_API_KEY=7X6AH4WWDUW8GXYXI6F8TZURM61B4EIK5E
+ETHERSCAN_API_KEY=YOUR_API_KEY_HERE
+INCOMING_ERC20_WHITELIST=0xcA82d24A97b33F2d5826575f77fdc8Bdb82FC580
 ```
 
 > ⚠️ Если ключ не установлен, **входящие транзакции не будут отображаться**, но приложение будет работать нормально (покажет только исходящие).
@@ -303,12 +309,15 @@ interface TransactionStatus {
 
 ### ❌ Входящие транзакции не появляются
 
-**Причина 1:** `ETHERSCAN_API_KEY` не установлена
+**Причина 1:** `ETHERSCAN_API_KEY` не передан в runtime приложения
 
 ```bash
-# Проверить:
+# Локально (dev):
 echo $ETHERSCAN_API_KEY
-# Если пусто → установить в .env или GitHub Secrets
+
+# Для Windows CI installer:
+# проверьте, что secret ETHERSCAN_API_KEY задан в GitHub Actions,
+# т.к. .env.example не подхватывается установленным .exe
 ```
 
 **Причина 2:** API ключ неверный

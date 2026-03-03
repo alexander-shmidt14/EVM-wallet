@@ -76,8 +76,7 @@ export const TransactionDetailPopup: React.FC<TransactionDetailPopupProps> = ({
     })
   }
 
-  const isOutgoing =
-    tx.direction === 'out' || tx.from.toLowerCase() !== tx.to.toLowerCase()
+  const isOutgoing = tx.direction !== 'in'
   const tokenLabel =
     tx.type === 'erc20' && tx.tokenSymbol ? tx.tokenSymbol : 'ETH'
 
