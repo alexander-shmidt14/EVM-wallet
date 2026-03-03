@@ -3,7 +3,7 @@ tags: [devops]
 related_files:
   - .github/workflows/windows-build.yml
   - apps/desktop/electron-builder-nosign.json
-  - apps/desktop/src/backend/auto-updater.ts
+  - apps/desktop/release/installer.nsi
 last_updated: 2026-03-03
 ---
 
@@ -35,15 +35,12 @@ flowchart TD
     D --> E[Build main + renderer]
     E --> F[Verify outputs]
     F --> G["electron-builder --dir (retry ×3)"]
-    G --> H{v* tag?}
-    H -- да --> I["electron-builder --win nsis<br/>--publish always<br/>+ GH_TOKEN"]
-    H -- нет --> J["electron-builder --win nsis<br/>(no publish)"]
-    I --> K[Generate SHA256]
-    J --> K
-    K --> L[Upload artifacts]
-    H -- да --> M[electron-builder publishes<br/>to GitHub Release<br/>latest.yml + .exe]
-    L --> N[Done]
-    M -.auto-update.-> O["Client Apps<br/>Detect + Install"]
+    G --> H["electron-builder --win nsis (retry ×3)"]
+    H --> I[Generate SHA256 checksums]
+    I --> J[Upload artifacts]
+    J --> K{v* tag?}
+    K -- да --> L[Create GitHub Release]
+    K -- нет --> M[Done]
 ```
 
 ## Electron binary cache
@@ -75,6 +72,15 @@ for ($i = 1; $i -le $maxRetries; $i++) {
 
 Причина: transient network EOF при скачивании Electron.
 
+## Build-time env для desktop main
+
+На шаге `Build main process` workflow передаёт env, которые вшиваются в `dist/main.js` через esbuild:
+- `ALCHEMY_RPC_MAINNET` / `INFURA_RPC_MAINNET`
+- `ETHERSCAN_API_KEY`
+- `INCOMING_ERC20_WHITELIST`
+
+Важно: `.env.example` — только шаблон. Для скачанного CI `.exe` используются значения из GitHub Actions Secrets/Variables.
+
 ## Unsigned build
 
 Используется `electron-builder-nosign.json`:
@@ -91,35 +97,15 @@ for ($i = 1; $i -le $maxRetries; $i++) {
 
 ## GitHub Release
 
-При push тага `v*` запускается publish:
-
-```yaml
-npx electron-builder --win nsis \
-  --config electron-builder-nosign.json \
-  --publish always
-```
-
-**Переменные окружения:**
-```yaml
-env:
-  CSC_IDENTITY_AUTO_DISCOVERY: "false"
-  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-```
-
-**Что происходит:**
-1. Сборка NSIS installer (`.exe`)
-2. Генерация метаданных `latest.yml` (для [[devops/auto-update|auto-updater]])
-3. Создание GitHub Release с тегом
-4. Загрузка файлов:
-   - `.exe` installer
-   - `latest.yml` (версия, хэш, URL)
-   - `blockmap` (для differential updates)
-
-Клиентские приложения затем автоматически проверяют `latest.yml` и скачивают новую версию.
+Создаётся автоматически при push тега `v*`:
+- Файлы: `.exe` + checksums
+- `generate_release_notes: true`
+- `prerelease` для тегов с `-beta` / `-rc`
 
 ---
 
 ## См. также
 
 - [[devops/ci-pipeline|CI Pipeline]] — runs before merge
-- [[devops/auto-update|Авто-обновления]] — electron-updater процесс
+- [[devops/release|Релиз]] — полный процесс релиза
+- [[architecture/monorepo|Монорепо]] — build order

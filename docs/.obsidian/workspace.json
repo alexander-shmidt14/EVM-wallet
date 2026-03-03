@@ -182,8 +182,8 @@
   "active": "4e782407736233bd",
   "lastOpenFiles": [
     "changelog/2026-03-03.md",
-    "devops/auto-update.md",
     "backend/transaction-history.md",
+    "devops/auto-update.md",
     "backend/ipc-reference.md",
     "backend/electron-main.md",
     "templates/ipc-handler-template.md",

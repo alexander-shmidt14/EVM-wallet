@@ -76,8 +76,10 @@ new WalletCore(
 
 | Метод | Параметры | Возврат | Описание |
 |-------|-----------|---------|----------|
-| `getLocalTransactions()` | — | `Promise<TransactionInfo[]>` | Локальный журнал отправленных |
+| `getLocalTransactions(address?)` | `string?` | `Promise<TransactionInfo[]>` | Локальный журнал. Per-wallet если указан address, иначе legacy `transactions_v1` |
 | `getIncomingTransactions(addr, limit?)` | `string, number` | `Promise<TransactionInfo[]>` | Etherscan API (входящие) |
+| `getTransactionHistory(address, limit?)` | `string, number` | `Promise<TransactionInfo[]>` | Объединённая история: local + incoming, дедупликация по hash, sorted by timestamp desc |
+| `getTransactionStatus(txHash)` | `string` | `Promise<TransactionStatus>` | Реальные данные из блокчейна: receipt + blockNumber → confirmations |
 
 ---
 
@@ -115,6 +117,15 @@ interface TransactionInfo {
   timestamp: number
   status: 'pending' | 'confirmed' | 'failed'
   blockNumber?: number
+  direction?: 'in' | 'out'       // Направление транзакции
+  confirmations?: number          // Количество подтверждений
+}
+
+interface TransactionStatus {
+  confirmations: number    // Количество блоков после tx
+  currentBlock: number     // Текущий номер блока
+  txBlock: number          // Блок транзакции
+  status: 'pending' | 'confirmed' | 'failed'
 }
 
 interface SecureStore {
@@ -157,7 +168,8 @@ interface SecureStore {
 | Ключ | Формат | Описание |
 |------|--------|----------|
 | `seed_v1` | `{"phrase": "word1 word2 ..."}` | BIP-39 мнемоника |
-| `transactions_v1` | `TransactionInfo[]` JSON | Журнал транзакций |
+| `transactions_v1` | `TransactionInfo[]` JSON | Журнал транзакций (legacy, глобальный) |
+| `transactions_v1_{address}` | `TransactionInfo[]` JSON | Журнал транзакций per-wallet (новый формат) |
 
 ---
 

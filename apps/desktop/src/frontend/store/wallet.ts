@@ -1,5 +1,5 @@
 ﻿import { create } from 'zustand'
-import type { TransactionStatus } from '@wallet/wallet-core'
+import type { TransactionInfo, TransactionStatus } from '@wallet/wallet-core'
 
 // Re-export types from wallet-core for use in components
 export type { TransactionInfo, TransactionStatus } from '@wallet/wallet-core'
@@ -30,9 +30,10 @@ interface ElectronAPI {
   sendErc20: (accountIndex: number, tokenAddress: string, to: string, amount: string) => Promise<any>
   estimateEthGas: (to: string, amount: string) => Promise<any>
   estimateErc20Gas: (tokenAddress: string, to: string, amount: string) => Promise<any>
-  getLocalTransactions: () => Promise<any[]>
+  getLocalTransactions: (address?: string) => Promise<any[]>
   getIncomingTransactions: (address: string, limit?: number) => Promise<any[]>
-  getTransactionStatus: (hash: string) => Promise<TransactionStatus>
+  getTransactionHistory: (address: string, limit?: number) => Promise<TransactionInfo[]>
+  getTransactionStatus: (txHash: string) => Promise<TransactionStatus>
   getSeedPhrase: () => Promise<string>
   resetWallet: () => Promise<void>
 }
@@ -45,6 +46,11 @@ declare global {
 
 const MMA_TOKEN_ADDRESS = '0xcA82d24A97b33F2d5826575f77fdc8Bdb82FC580'
 const MMA_PRICE_USD = 55
+
+// Cache ETH price to avoid CoinGecko 429 rate-limit errors (free tier: ~10-30 req/min)
+let _cachedEthPrice: number = 0
+let _ethPriceFetchedAt: number = 0
+const ETH_PRICE_CACHE_MS = 60_000 // 60 seconds
 
 interface SavedWallet {
   id: string
@@ -76,6 +82,10 @@ interface WalletState {
   isLoading: boolean
   error: string | null
 
+  // Transactions
+  transactions: TransactionInfo[]
+  isLoadingTransactions: boolean
+
   // Auth actions
   checkAuth: () => Promise<void>
   setPassword: (password: string) => Promise<void>
@@ -93,6 +103,7 @@ interface WalletState {
   initialize: () => Promise<void>
   loadBalance: () => Promise<void>
   loadSeedPhrase: () => Promise<void>
+  loadTransactions: () => Promise<void>
   reset: () => Promise<void>
 }
 
@@ -114,6 +125,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   totalBalanceUsd: null,
   isLoading: false,
   error: null,
+  transactions: [],
+  isLoadingTransactions: false,
 
   // ─── Auth actions ──────────────────────────
   checkAuth: async () => {
@@ -225,6 +238,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         ethBalance: null,
         mmaBalance: null,
         mmaBalanceUsd: null,
+        transactions: [],
         isLoading: false,
       })
 
@@ -315,13 +329,19 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       const balance = await window.electronAPI.getEthBalance(currentAddress)
       set({ ethBalance: balance.formatted })
 
-      // Fetch ETH price
-      let ethPrice = 0
-      try {
-        const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd')
-        const data = await res.json()
-        ethPrice = data?.ethereum?.usd ?? 0
-      } catch { ethPrice = 0 }
+      // Fetch ETH price (with 60s cache to avoid CoinGecko 429)
+      let ethPrice = _cachedEthPrice
+      if (Date.now() - _ethPriceFetchedAt > ETH_PRICE_CACHE_MS) {
+        try {
+          const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd')
+          if (res.ok) {
+            const data = await res.json()
+            ethPrice = data?.ethereum?.usd ?? _cachedEthPrice
+            _cachedEthPrice = ethPrice
+            _ethPriceFetchedAt = Date.now()
+          }
+        } catch { /* keep cached value */ }
+      }
 
       const ethUsd = (parseFloat(balance.formatted) * ethPrice).toFixed(2)
       set({ ethBalanceUsd: ethUsd })
@@ -354,6 +374,20 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       set({ seedPhrase: phrase })
     } catch (e) {
       console.error('Failed to load seed phrase:', e)
+    }
+  },
+
+  loadTransactions: async () => {
+    try {
+      const { currentAddress } = get()
+      if (!currentAddress) return
+
+      set({ isLoadingTransactions: true })
+      const transactions = await window.electronAPI.getTransactionHistory(currentAddress, 50)
+      set({ transactions, isLoadingTransactions: false })
+    } catch (error) {
+      console.error('Failed to load transactions:', error)
+      set({ isLoadingTransactions: false })
     }
   },
 
