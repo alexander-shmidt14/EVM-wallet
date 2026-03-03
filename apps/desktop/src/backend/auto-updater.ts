@@ -39,7 +39,7 @@ export const initAutoUpdater = (mainWindow: BrowserWindow): void => {
   log.info('Initializing auto-updater')
 
   // ─── Update Available ──────────────────────────────────────────────
-  autoUpdater.on('update-available', (info) => {
+  autoUpdater.on('update-available', (info: any) => {
     log.info(`Update available: ${info.version}`, {
       currentVersion: app.getVersion(),
       newVersion: info.version
@@ -69,18 +69,18 @@ export const initAutoUpdater = (mainWindow: BrowserWindow): void => {
           log.info('User deferred update')
         }
       })
-      .catch((err) => {
+      .catch((err: any) => {
         log.error('Error showing update available dialog', err)
       })
   })
 
   // ─── Update Not Available ──────────────────────────────────────────
-  autoUpdater.on('update-not-available', (info) => {
+  autoUpdater.on('update-not-available', (info: any) => {
     log.info('No update available', { currentVersion: app.getVersion() })
   })
 
   // ─── Download Progress ────────────────────────────────────────────
-  autoUpdater.on('download-progress', (progress) => {
+  autoUpdater.on('download-progress', (progress: any) => {
     const percent = Math.round((progress.transferred / progress.total) * 100)
     log.info(`Download progress: ${percent}%`)
 
@@ -93,7 +93,7 @@ export const initAutoUpdater = (mainWindow: BrowserWindow): void => {
   })
 
   // ─── Update Downloaded ────────────────────────────────────────────
-  autoUpdater.on('update-downloaded', (info) => {
+  autoUpdater.on('update-downloaded', (info: any) => {
     log.info('Update downloaded successfully', {
       version: info.version,
       path: info.path
@@ -127,13 +127,13 @@ export const initAutoUpdater = (mainWindow: BrowserWindow): void => {
           updateAvailableInfo = null
         }
       })
-      .catch((err) => {
+      .catch((err: any) => {
         log.error('Error showing update ready dialog', err)
       })
   })
 
   // ─── Update Error ────────────────────────────────────────────────
-  autoUpdater.on('error', (error) => {
+  autoUpdater.on('error', (error: any) => {
     log.error('Auto-updater error', {
       message: error.message,
       stack: error.stack
@@ -153,7 +153,7 @@ export const initAutoUpdater = (mainWindow: BrowserWindow): void => {
         detail: 'Please try again later or check your internet connection.',
         buttons: ['OK']
       })
-      .catch((err) => {
+      .catch((err: any) => {
         log.error('Error showing update error dialog', err)
       })
   })
@@ -162,7 +162,7 @@ export const initAutoUpdater = (mainWindow: BrowserWindow): void => {
   log.info('Checking for updates')
   autoUpdater
     .checkForUpdates()
-    .catch((err) => {
+    .catch((err: any) => {
       log.error('Failed to check for updates', err)
     })
 
@@ -171,7 +171,7 @@ export const initAutoUpdater = (mainWindow: BrowserWindow): void => {
     log.info('Periodic update check')
     autoUpdater
       .checkForUpdates()
-      .catch((err) => {
+      .catch((err: any) => {
         log.error('Failed to check for updates (periodic)', err)
       })
   }, 30 * 60 * 1000)

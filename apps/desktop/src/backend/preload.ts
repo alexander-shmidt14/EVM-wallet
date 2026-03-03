@@ -54,3 +54,10 @@ const electronAPI = {
     // Return unsubscribe function
     return () => ipcRenderer.removeAllListeners('update-progress')
   }
+}
+
+// Expose the API to the renderer process
+contextBridge.exposeInMainWorld('electronAPI', electronAPI)
+
+// Type definition for the exposed API
+export type ElectronAPI = typeof electronAPI
