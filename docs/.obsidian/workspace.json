@@ -185,6 +185,7 @@
   },
   "active": "4e782407736233bd",
   "lastOpenFiles": [
+    "backend/transaction-history.md",
     "changelog/2026-03-03.md",
     "backend/electron-main.md",
     "templates/ipc-handler-template.md",
@@ -215,7 +216,6 @@
     "frontend/screens",
     "frontend/app-flow.md",
     "frontend",
-    "devops/_index.md",
     "devops",
     "changelog",
     "backend",
