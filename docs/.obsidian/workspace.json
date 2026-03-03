@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "backend/ipc-reference.md",
+                "file": "backend/transaction-history.md",
                 "mode": "preview",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "ipc-reference"
+              "title": "transaction-history"
             }
           }
         ]
@@ -185,6 +185,7 @@
   },
   "active": "4e782407736233bd",
   "lastOpenFiles": [
+    "backend/ipc-reference.md",
     "backend/transaction-history.md",
     "changelog/2026-03-03.md",
     "backend/electron-main.md",
@@ -214,7 +215,6 @@
     "frontend/store.md",
     "frontend/components.md",
     "frontend/screens",
-    "frontend/app-flow.md",
     "frontend",
     "devops",
     "changelog",

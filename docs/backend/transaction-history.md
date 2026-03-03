@@ -218,7 +218,7 @@ async getIncomingTransactions(address: string, limit = 50): Promise<TransactionI
 3. Добавить в `.env`:
 
 ```env
-ETHERSCAN_API_KEY=YOUR_KEY_HERE
+ETHERSCAN_API_KEY=7X6AH4WWDUW8GXYXI6F8TZURM61B4EIK5E
 ```
 
 > ⚠️ Если ключ не установлен, **входящие транзакции не будут отображаться**, но приложение будет работать нормально (покажет только исходящие).
