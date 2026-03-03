@@ -125,8 +125,8 @@ git push origin v1.0.1   # triggers release build + upload
 Copy `.env.example` → `.env` and fill in your keys:
 
 ```
-ALCHEMY_RPC_MAINNET=https://eth-mainnet.g.alchemy.com/v2/U0-OuxCXH-ncvSZ-0lGOI
-ETHERSCAN_API_KEY=7X6AH4WWDUW8GXYXI6F8TZURM61B4EIK5E
+ALCHEMY_RPC_MAINNET=https://eth-mainnet.g.alchemy.com/v2/key
+ETHERSCAN_API_KEY=key
 ```
 
 ## Documentation
