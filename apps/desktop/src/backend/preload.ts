@@ -50,7 +50,14 @@ const electronAPI = {
   importNewWallet: (name: string, seedPhrase: string) => ipcRenderer.invoke('wallets:import', name, seedPhrase),
   selectWallet: (walletId: string) => ipcRenderer.invoke('wallets:select', walletId),
   deleteWallet: (walletId: string) => ipcRenderer.invoke('wallets:delete', walletId),
-  getActiveWalletId: () => ipcRenderer.invoke('wallets:getActiveId')
+  getActiveWalletId: () => ipcRenderer.invoke('wallets:getActiveId'),
+
+  // Updates
+  onUpdateProgress: (callback: (progress: { percent: number }) => void) => {
+    ipcRenderer.on('update-progress', (_, progress) => callback(progress))
+    // Return unsubscribe function
+    return () => ipcRenderer.removeAllListeners('update-progress')
+  }
 }
 
 // Expose the API to the renderer process

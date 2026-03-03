@@ -1,27 +1,8 @@
 ﻿import { create } from 'zustand'
+import type { TransactionInfo, TransactionStatus } from '@wallet/wallet-core'
 
-export interface TransactionInfo {
-  hash: string
-  from: string
-  to: string
-  value: string
-  type: 'eth' | 'erc20'
-  tokenAddress?: string
-  tokenSymbol?: string
-  tokenDecimals?: number
-  timestamp: number
-  status: 'pending' | 'confirmed' | 'failed'
-  blockNumber?: number
-  direction?: 'in' | 'out'
-  confirmations?: number
-}
-
-export interface TransactionStatus {
-  confirmations: number
-  currentBlock: number
-  txBlock: number | null
-  status: 'pending' | 'confirmed' | 'failed'
-}
+// Re-export types from wallet-core for use in components
+export type { TransactionInfo, TransactionStatus } from '@wallet/wallet-core'
 
 interface ElectronAPI {
   // Auth

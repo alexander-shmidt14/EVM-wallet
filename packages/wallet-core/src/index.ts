@@ -70,10 +70,12 @@ export interface TransactionInfo {
 }
 
 export interface TransactionStatus {
+  hash: string
+  status: 'pending' | 'confirmed' | 'failed'
   confirmations: number
   currentBlock: number
   txBlock: number | null
-  status: 'pending' | 'confirmed' | 'failed'
+  blockNumber?: number
 }
 
 export class WalletCore {
@@ -555,6 +557,7 @@ export class WalletCore {
 
       if (!receipt) {
         return {
+          hash: txHash,
           confirmations: 0,
           currentBlock,
           txBlock: null,
@@ -565,14 +568,17 @@ export class WalletCore {
       const confirmations = currentBlock - receipt.blockNumber + 1
 
       return {
+        hash: txHash,
         confirmations,
         currentBlock,
         txBlock: receipt.blockNumber,
+        blockNumber: receipt.blockNumber,
         status: receipt.status === 1 ? 'confirmed' : 'failed'
       }
     } catch (error) {
       console.error('Get transaction status error:', error)
       return {
+        hash: txHash,
         confirmations: 0,
         currentBlock: 0,
         txBlock: null,
