@@ -70,16 +70,11 @@ export interface TransactionInfo {
 }
 
 export interface TransactionStatus {
-  confirmations: number
-  currentBlock: number
-  txBlock: number | null
-  status: 'pending' | 'confirmed' | 'failed'
-}
-
-export interface TransactionStatus {
   hash: string
   status: 'pending' | 'confirmed' | 'failed'
   confirmations: number
+  currentBlock: number
+  txBlock: number | null
   blockNumber?: number
 }
 
@@ -562,6 +557,7 @@ export class WalletCore {
 
       if (!receipt) {
         return {
+          hash: txHash,
           confirmations: 0,
           currentBlock,
           txBlock: null,
@@ -572,14 +568,17 @@ export class WalletCore {
       const confirmations = currentBlock - receipt.blockNumber + 1
 
       return {
+        hash: txHash,
         confirmations,
         currentBlock,
         txBlock: receipt.blockNumber,
+        blockNumber: receipt.blockNumber,
         status: receipt.status === 1 ? 'confirmed' : 'failed'
       }
     } catch (error) {
       console.error('Get transaction status error:', error)
       return {
+        hash: txHash,
         confirmations: 0,
         currentBlock: 0,
         txBlock: null,
@@ -660,37 +659,6 @@ export class WalletCore {
     } catch (error) {
       console.error('Get incoming transactions error:', error)
       return []
-    }
-  }
-
-  /**
-   * Получает статус транзакции из сети
-   */
-  async getTransactionStatus(hash: string): Promise<TransactionStatus> {
-    try {
-      const receipt = await this.provider().getTransactionReceipt(hash)
-      
-      if (!receipt) {
-        // Транзакция еще не подтверждена
-        return {
-          hash,
-          status: 'pending',
-          confirmations: 0
-        }
-      }
-
-      const currentBlock = await this.provider().getBlockNumber()
-      const confirmations = currentBlock - receipt.blockNumber + 1
-
-      return {
-        hash,
-        status: receipt.status === 1 ? 'confirmed' : 'failed',
-        confirmations,
-        blockNumber: receipt.blockNumber
-      }
-    } catch (error) {
-      console.error('Get transaction status error:', error)
-      throw error
     }
   }
 
