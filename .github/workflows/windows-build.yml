@@ -127,12 +127,7 @@ jobs:
         shell: pwsh
         run: |
           $maxRetries = 3
-          $builderArgs = @("--win", "nsis", "--config", "electron-builder-nosign.json")
-          if ("${{ github.ref }}".StartsWith("refs/tags/v")) {
-            $builderArgs += "--publish"
-            $builderArgs += "always"
-            Write-Host "Publishing enabled (tag detected)"
-          }
+          $builderArgs = @("--win", "nsis", "--config", "electron-builder-nosign.json", "--publish", "never")
           for ($i = 1; $i -le $maxRetries; $i++) {
             Write-Host "Attempt $i of $maxRetries..."
             & npx electron-builder @builderArgs
@@ -147,7 +142,6 @@ jobs:
           }
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # ── Checksums ──────────────────────────────────────────────────
       - name: Generate checksums
@@ -196,16 +190,15 @@ jobs:
           Write-Host "   → Download 'EVM-Wallet-Setup-*' for the .exe installer"
           Write-Host ""
 
-      # ── GitHub Release (tags only - handled by electron-builder publish) ────────
-      # NOTE: For tags with --publish always, electron-builder handles GitHub Release
-      # creation directly. This step is kept as backup for non-tag releases if needed.
-      - name: Create GitHub Release (legacy - disabled for tags)
-        if: startsWith(github.ref, 'refs/tags/v') && false
+      # ── GitHub Release (tags only) ─────────────────────────────────
+      - name: Upload to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: |
             apps/desktop/release/*.exe
+            apps/desktop/release/*.yml
+            apps/desktop/release/*.blockmap
             apps/desktop/release/SHA256SUMS.txt
-          generate_release_notes: true
-          draft: false
-          prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-rc') }}
+          tag_name: ${{ github.ref_name }}
+          fail_on_unmatched_files: false
