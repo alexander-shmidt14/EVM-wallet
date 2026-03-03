@@ -61,6 +61,9 @@ const AppContent: React.FC = () => {
           <Route path="/send" element={<SendScreen />} />
         </Routes>
         {/* <AppToastContainer /> */}
+        <span style={{ fontSize: '10px', opacity: 0.5, position: 'fixed', bottom: '4px', right: '8px' }}>
+          v1.1.1
+        </span>
       </div>
     </Router>
   )
