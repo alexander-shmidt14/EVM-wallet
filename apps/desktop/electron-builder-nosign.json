@@ -28,7 +28,6 @@
   "publish": {
     "provider": "github",
     "owner": "alexander-shmidt14",
-    "repo": "EVM-wallet",
-    "token": "${GH_TOKEN}"
+    "repo": "EVM-wallet"
   }
 }

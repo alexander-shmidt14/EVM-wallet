@@ -127,14 +127,15 @@ jobs:
         shell: pwsh
         run: |
           $maxRetries = 3
-          $publishFlag = ""
+          $builderArgs = @("--win", "nsis", "--config", "electron-builder-nosign.json")
           if ("${{ github.ref }}".StartsWith("refs/tags/v")) {
-            $publishFlag = "--publish always"
+            $builderArgs += "--publish"
+            $builderArgs += "always"
             Write-Host "Publishing enabled (tag detected)"
           }
           for ($i = 1; $i -le $maxRetries; $i++) {
             Write-Host "Attempt $i of $maxRetries..."
-            Invoke-Expression "npx electron-builder --win nsis --config electron-builder-nosign.json $publishFlag"
+            & npx electron-builder @builderArgs
             if ($LASTEXITCODE -eq 0) { break }
             if ($i -lt $maxRetries) {
               Write-Host "Failed, retrying in 15 seconds..."

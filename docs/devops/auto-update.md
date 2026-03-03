@@ -71,17 +71,16 @@ Publish configuration для GitHub:
 "publish": {
   "provider": "github",
   "owner": "alexander-shmidt14",
-  "repo": "EVM-wallet",
-  "token": "${GH_TOKEN}"
+  "repo": "EVM-wallet"
 }
 ```
 
-**Примечание:** `${GH_TOKEN}` подставляется из переменной окружения `GH_TOKEN` в GitHub Actions.
+**Примечание:** Репозиторий публичный — токен в конфиге не нужен. При публикации релизов (тег `v*`) `GH_TOKEN` передаётся через переменную окружения в GitHub Actions (`secrets.GITHUB_TOKEN`), electron-builder подхватывает его автоматически.
 
 ### 3. GitHub Actions Workflow
 **Файл:** `.github/workflows/windows-build.yml`
 
-При push тага `v*`:
+При push тега `v*` workflow автоматически добавляет `--publish always`:
 ```bash
 npx electron-builder --win nsis \
   --config electron-builder-nosign.json \
@@ -93,7 +92,7 @@ npx electron-builder --win nsis \
 2. Генерацию `latest.yml` (метаданные для updater)
 3. Загрузку `.exe` и `latest.yml` в GitHub Release
 
-**Переменная окружения:**
+**Переменная окружения** (передаётся через env в workflow, не в конфиге):
 ```yaml
 env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
