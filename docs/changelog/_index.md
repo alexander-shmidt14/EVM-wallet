@@ -1,6 +1,6 @@
 ---
 tags: [moc, changelog]
-last_updated: 2026-03-02
+last_updated: 2026-03-03
 ---
 
 # Changelog
@@ -15,6 +15,7 @@ last_updated: 2026-03-02
 
 | Дата | Описание |
 |------|----------|
+| [[changelog/2026-03-03\|2026-03-03]] | Electron Auto-Update System: electron-updater, --publish always, progress tracking |
 | [[changelog/2026-03-02\|2026-03-02]] | Документация, UI иконки, Windows build, CI/CD, Docker, архитектура |
 
 ---

@@ -3,6 +3,7 @@ import { join } from 'path'
 import { createHash } from 'crypto'
 import { WalletCore } from '@wallet/wallet-core'
 import { secureStore } from './secure-store'
+import { initAutoUpdater } from './auto-updater'
 
 // Keep a global reference of the window object
 let mainWindow: BrowserWindow | null = null
@@ -55,6 +56,11 @@ const createWindow = (): void => {
 app.whenReady().then(() => {
   initWalletCore()
   createWindow()
+
+  // Initialize auto-updater in production
+  if (!isDevelopment && mainWindow) {
+    initAutoUpdater(mainWindow)
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

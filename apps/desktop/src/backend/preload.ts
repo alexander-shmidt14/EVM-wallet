@@ -46,11 +46,11 @@ const electronAPI = {
   importNewWallet: (name: string, seedPhrase: string) => ipcRenderer.invoke('wallets:import', name, seedPhrase),
   selectWallet: (walletId: string) => ipcRenderer.invoke('wallets:select', walletId),
   deleteWallet: (walletId: string) => ipcRenderer.invoke('wallets:delete', walletId),
-  getActiveWalletId: () => ipcRenderer.invoke('wallets:getActiveId')
-}
+  getActiveWalletId: () => ipcRenderer.invoke('wallets:getActiveId'),
 
-// Expose the API to the renderer process
-contextBridge.exposeInMainWorld('electronAPI', electronAPI)
-
-// Type definition for the exposed API
-export type ElectronAPI = typeof electronAPI
+  // Updates
+  onUpdateProgress: (callback: (progress: { percent: number }) => void) => {
+    ipcRenderer.on('update-progress', (_, progress) => callback(progress))
+    // Return unsubscribe function
+    return () => ipcRenderer.removeAllListeners('update-progress')
+  }

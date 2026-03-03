@@ -3,8 +3,8 @@ tags: [devops]
 related_files:
   - .github/workflows/windows-build.yml
   - apps/desktop/electron-builder-nosign.json
-  - apps/desktop/release/installer.nsi
-last_updated: 2026-03-02
+  - apps/desktop/src/backend/auto-updater.ts
+last_updated: 2026-03-03
 ---
 
 # Windows Build
@@ -35,12 +35,15 @@ flowchart TD
     D --> E[Build main + renderer]
     E --> F[Verify outputs]
     F --> G["electron-builder --dir (retry ×3)"]
-    G --> H["electron-builder --win nsis (retry ×3)"]
-    H --> I[Generate SHA256 checksums]
-    I --> J[Upload artifacts]
-    J --> K{v* tag?}
-    K -- да --> L[Create GitHub Release]
-    K -- нет --> M[Done]
+    G --> H{v* tag?}
+    H -- да --> I["electron-builder --win nsis<br/>--publish always<br/>+ GH_TOKEN"]
+    H -- нет --> J["electron-builder --win nsis<br/>(no publish)"]
+    I --> K[Generate SHA256]
+    J --> K
+    K --> L[Upload artifacts]
+    H -- да --> M[electron-builder publishes<br/>to GitHub Release<br/>latest.yml + .exe]
+    L --> N[Done]
+    M -.auto-update.-> O["Client Apps<br/>Detect + Install"]
 ```
 
 ## Electron binary cache
@@ -88,15 +91,35 @@ for ($i = 1; $i -le $maxRetries; $i++) {
 
 ## GitHub Release
 
-Создаётся автоматически при push тега `v*`:
-- Файлы: `.exe` + checksums
-- `generate_release_notes: true`
-- `prerelease` для тегов с `-beta` / `-rc`
+При push тага `v*` запускается publish:
+
+```yaml
+npx electron-builder --win nsis \
+  --config electron-builder-nosign.json \
+  --publish always
+```
+
+**Переменные окружения:**
+```yaml
+env:
+  CSC_IDENTITY_AUTO_DISCOVERY: "false"
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+**Что происходит:**
+1. Сборка NSIS installer (`.exe`)
+2. Генерация метаданных `latest.yml` (для [[devops/auto-update|auto-updater]])
+3. Создание GitHub Release с тегом
+4. Загрузка файлов:
+   - `.exe` installer
+   - `latest.yml` (версия, хэш, URL)
+   - `blockmap` (для differential updates)
+
+Клиентские приложения затем автоматически проверяют `latest.yml` и скачивают новую версию.
 
 ---
 
 ## См. также
 
 - [[devops/ci-pipeline|CI Pipeline]] — runs before merge
-- [[devops/release|Релиз]] — полный процесс релиза
-- [[architecture/monorepo|Монорепо]] — build order
+- [[devops/auto-update|Авто-обновления]] — electron-updater процесс

@@ -2,7 +2,8 @@
 tags: [backend]
 related_files:
   - apps/desktop/src/backend/main.ts
-last_updated: 2026-03-02
+  - apps/desktop/src/backend/auto-updater.ts
+last_updated: 2026-03-03
 ---
 
 # Electron Main Process
@@ -24,11 +25,16 @@ flowchart TD
     C --> D[BrowserWindow: 800×600]
     D --> E[loadFile: dist/renderer/index.html]
     E --> F[ready-to-show → show]
-    F --> G[Ожидание IPC вызовов]
+    F --> G{isDevelopment?}
+    G -- нет --> H[initAutoUpdater<br/>проверка обновлений]
+    G -- да --> I[Skip updater]
+    H --> J[Update check: 30 min interval]
+    I --> K[Ожидание IPC вызовов]
+    J --> K
     
-    H[window-all-closed] --> I{darwin?}
-    I -- нет --> J[app.quit]
-    I -- да --> K[остаёмся в dock]
+    L[window-all-closed] --> M{darwin?}
+    M -- нет --> N[app.quit]
+    M -- да --> O[остаёмся в dock]
 ```
 
 ## Настройки BrowserWindow
@@ -62,6 +68,28 @@ walletCore = new WalletCore(rpcUrl, secureStore, etherscanApiKey)
 
 Приоритет RPC: Alchemy → Infura → PublicNode (бесплатный).
 
+## Инициализация Auto-Updater
+
+После создания окна инициализируется система обновлений (только в production):
+
+```typescript
+// В app.whenReady():
+if (!isDevelopment && mainWindow) {
+  initAutoUpdater(mainWindow)
+}
+```
+
+**File:** `apps/desktop/src/backend/auto-updater.ts`
+
+**Возможности:**
+- ✅ Проверка обновлений при старте
+- ✅ Периодическая проверка (каждые 30 минут)
+- ✅ Диалоги пользователю (скачать? перезагрузить?)
+- ✅ Прогресс-бар (taskbar + IPC к renderer)
+- ✅ Логирование всех событий
+
+Подробнее: [[devops/auto-update|Система авто-обновлений]].
+
 ## Ключевые константы
 
 | Константа | Значение | Назначение |
@@ -83,6 +111,8 @@ walletCore = new WalletCore(rpcUrl, secureStore, etherscanApiKey)
 
 ## См. также
 
+- [[backend/auto-updater|Auto-Updater]] — electron-updater интеграция
 - [[backend/preload|Preload]] — как хендлеры экспортируются в renderer
 - [[backend/secure-store|Secure Store]] — хранилище, которое использует main.ts
+- [[devops/auto-update|Авто-обновления]] — клиентская сторона (DevOps)
 - [[architecture/security|Безопасность]] — почему такие настройки BrowserWindow
