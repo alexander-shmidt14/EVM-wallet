@@ -71,8 +71,10 @@ last_updated: 2026-03-02
 
 | Канал | Параметры | Возврат | Описание |
 |-------|-----------|---------|----------|
-| `wallet:getLocalTransactions` | — | `TransactionInfo[]` | Локальный журнал отправленных tx |
+| `wallet:getLocalTransactions` | `address?: string` | `TransactionInfo[]` | Локальный журнал отправленных tx (per-wallet если указан address) |
 | `wallet:getIncomingTransactions` | `address, limit?` | `TransactionInfo[]` | Входящие tx через Etherscan API |
+| `wallet:getTransactionHistory` | `address: string, limit?: number` | `TransactionInfo[]` | Объединённая история: local (исходящие) + Etherscan (входящие), дедупликация по hash, сортировка по timestamp desc |
+| `wallet:getTransactionStatus` | `txHash: string` | `TransactionStatus` | Реальный статус из блокчейна: confirmations, текущий/tx блок, статус |
 
 ---
 
@@ -91,6 +93,15 @@ interface TransactionInfo {
   timestamp: number
   status: 'pending' | 'confirmed' | 'failed'
   blockNumber?: number
+  direction?: 'in' | 'out'       // Направление транзакции
+  confirmations?: number          // Количество подтверждений
+}
+
+interface TransactionStatus {
+  confirmations: number    // Количество блоков после tx
+  currentBlock: number     // Текущий номер блока
+  txBlock: number          // Блок транзакции
+  status: 'pending' | 'confirmed' | 'failed'
 }
 ```
 

@@ -32,7 +32,14 @@ last_updated: 2026-03-02
 - **MMA Coin:** [[frontend/components#Иконки|MmaIcon]] + баланс MMA + USD
 - Кнопка "Add Token" (placeholder)
 
-### 4. Seed Phrase
+### 4. История транзакций (Recent Transactions)
+- [[frontend/components#История транзакций|TransactionItem]] для каждой tx (max 10 на экране)
+- Клик по транзакции → [[frontend/components#История транзакций|TransactionDetailPopup]] (детали + анимация блоков + Etherscan ссылка)
+- Кнопка “View All” при > 5 транзакциях
+- Автообновление каждые 30 сек
+- Per-wallet: история отдельная для каждого кошелька
+
+### 5. Seed Phrase
 - Скрыт по умолчанию
 - Кнопка "Показать" → отображение 12 слов
 - Кнопка "Скопировать" → буфер обмена + feedback
@@ -47,7 +54,11 @@ last_updated: 2026-03-02
 useEffect(() => {
   loadBalance()
   loadSeedPhrase()
-  const interval = setInterval(loadBalance, 30000)  // каждые 30 сек
+  loadTransactions()
+  const interval = setInterval(() => {
+    loadBalance()
+    loadTransactions()
+  }, 30000)  // каждые 30 сек
   return () => clearInterval(interval)
 }, [])
 ```
@@ -58,13 +69,14 @@ useEffect(() => {
 |-------|---------|
 | `wallet:getEthBalance` | Загрузка ETH баланса |
 | `wallet:getErc20Balance` | Загрузка MMA баланса |
-| `wallet:getSeedPhrase` | Загрузка seed phrase |
-| `wallets:delete` | Удаление кошелька |
+| `wallet:getSeedPhrase` | Загрузка seed phrase || `wallet:getTransactionHistory` | Объединённая история транзакций |
+| `wallet:getTransactionStatus` | Реальный статус tx (в попапе) || `wallets:delete` | Удаление кошелька |
 
 ## Store actions
 
 - `loadBalance()` — ETH + MMA + USD расчёт
 - `loadSeedPhrase()` — загрузка seed
+- `loadTransactions()` — загрузка объединённой истории (входящие + исходящие)
 - `deleteWallet(id)` — удаление
 
 ## Навигация

@@ -3,6 +3,7 @@ import { join } from 'path'
 import { createHash } from 'crypto'
 import { WalletCore } from '@wallet/wallet-core'
 import { secureStore } from './secure-store'
+import { initAutoUpdater } from './auto-updater'
 
 // Keep a global reference of the window object
 let mainWindow: BrowserWindow | null = null
@@ -19,7 +20,17 @@ const ACTIVE_WALLET_KEY = 'active_wallet_id'
 const initWalletCore = () => {
   const rpcUrl = process.env.ALCHEMY_RPC_MAINNET || process.env.INFURA_RPC_MAINNET || 'https://ethereum.publicnode.com'
   const etherscanApiKey = process.env.ETHERSCAN_API_KEY
-  walletCore = new WalletCore(rpcUrl, secureStore, etherscanApiKey)
+  const incomingTokenWhitelist = (process.env.INCOMING_ERC20_WHITELIST || '')
+    .split(',')
+    .map((address) => address.trim())
+    .filter(Boolean)
+
+  walletCore = new WalletCore(
+    rpcUrl,
+    secureStore,
+    etherscanApiKey,
+    incomingTokenWhitelist.length > 0 ? incomingTokenWhitelist : undefined
+  )
 }
 
 const createWindow = (): void => {
@@ -55,6 +66,11 @@ const createWindow = (): void => {
 app.whenReady().then(() => {
   initWalletCore()
   createWindow()
+
+  // Initialize auto-updater in production
+  if (!isDevelopment && mainWindow) {
+    initAutoUpdater(mainWindow)
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -214,14 +230,24 @@ ipcMain.handle('wallet:estimateErc20Gas', async (_, tokenAddress: string, to: st
   return walletCore.estimateErc20Gas(tokenAddress, to, amount)
 })
 
-ipcMain.handle('wallet:getLocalTransactions', async () => {
+ipcMain.handle('wallet:getLocalTransactions', async (_, address?: string) => {
   if (!walletCore) throw new Error('Wallet core not initialized')
-  return walletCore.getLocalTransactions()
+  return walletCore.getLocalTransactions(address)
 })
 
 ipcMain.handle('wallet:getIncomingTransactions', async (_, address: string, limit: number = 50) => {
   if (!walletCore) throw new Error('Wallet core not initialized')
   return walletCore.getIncomingTransactions(address, limit)
+})
+
+ipcMain.handle('wallet:getTransactionHistory', async (_, address: string, limit: number = 50) => {
+  if (!walletCore) throw new Error('Wallet core not initialized')
+  return walletCore.getTransactionHistory(address, limit)
+})
+
+ipcMain.handle('wallet:getTransactionStatus', async (_, txHash: string) => {
+  if (!walletCore) throw new Error('Wallet core not initialized')
+  return walletCore.getTransactionStatus(txHash)
 })
 
 ipcMain.handle('wallet:getSeedPhrase', async () => {

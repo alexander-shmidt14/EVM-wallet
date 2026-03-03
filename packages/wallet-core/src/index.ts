@@ -1,7 +1,8 @@
-import { JsonRpcProvider, HDNodeWallet, Contract, formatEther, parseUnits, getAddress, TransactionReceipt, TransactionRequest } from 'ethers'
+import { JsonRpcProvider, HDNodeWallet, Contract, formatEther, formatUnits, parseUnits, getAddress, TransactionReceipt, TransactionRequest } from 'ethers'
 import type { SecureStore } from './secure-store'
 import erc20Abi from './erc20.abi.json'
 import 'cross-fetch/polyfill'
+import { MMA_TOKEN_ADDRESS } from './meta'
 
 // Re-export types
 export type { SecureStore } from './secure-store'
@@ -26,6 +27,11 @@ export type { TokenMetadata } from './meta'
 
 const SEED_KEY = 'seed_v1'
 const TRANSACTIONS_KEY = 'transactions_v1'
+
+/** Per-wallet transaction storage key */
+function txKey(address: string): string {
+  return `transactions_v1_${address.toLowerCase()}`
+}
 
 export interface TokenBalance {
   raw: string
@@ -58,16 +64,50 @@ export interface TransactionInfo {
   timestamp: number
   status: 'pending' | 'confirmed' | 'failed'
   blockNumber?: number
+  direction?: 'in' | 'out'
+  confirmations?: number
+  logIndex?: number
+}
+
+export interface TransactionStatus {
+  hash: string
+  status: 'pending' | 'confirmed' | 'failed'
+  confirmations: number
+  currentBlock: number
+  txBlock: number | null
+  blockNumber?: number
 }
 
 export class WalletCore {
   private _provider: JsonRpcProvider | null = null
+  private incomingTokenWhitelist: Set<string>
 
   constructor(
     private rpcUrl: string, 
     private store: SecureStore,
-    private etherscanApiKey?: string
-  ) {}
+    private etherscanApiKey?: string,
+    incomingTokenWhitelist: string[] = [MMA_TOKEN_ADDRESS]
+  ) {
+    this.incomingTokenWhitelist = new Set(
+      incomingTokenWhitelist
+        .map((address) => address.toLowerCase().trim())
+        .filter(Boolean)
+    )
+  }
+
+  private txDedupKey(tx: TransactionInfo): string {
+    if (tx.type === 'erc20') {
+      return [
+        tx.hash,
+        tx.tokenAddress?.toLowerCase() || '',
+        tx.from.toLowerCase(),
+        tx.to.toLowerCase(),
+        tx.value,
+        String(tx.logIndex ?? ''),
+      ].join(':')
+    }
+    return tx.hash.toLowerCase()
+  }
 
   private provider(): JsonRpcProvider {
     if (!this._provider) {
@@ -168,22 +208,23 @@ export class WalletCore {
 
       const sentTx = await signer.sendTransaction(tx)
       
-      // Сохраняем транзакцию в локальный журнал
-      await this.saveTransaction({
+      // Сохраняем транзакцию в локальный журнал (per-wallet)
+      await this.saveTransaction(signer.address, {
         hash: sentTx.hash,
         from: signer.address,
         to: validTo,
         value: amountEth,
         type: 'eth',
         timestamp: Date.now(),
-        status: 'pending'
+        status: 'pending',
+        direction: 'out'
       })
 
       const receipt = await sentTx.wait()
       
       // Обновляем статус в журнале
       if (receipt) {
-        await this.updateTransactionStatus(sentTx.hash, receipt.status === 1 ? 'confirmed' : 'failed', receipt.blockNumber)
+        await this.updateTransactionStatus(signer.address, sentTx.hash, receipt.status === 1 ? 'confirmed' : 'failed', receipt.blockNumber)
       }
 
       return receipt
@@ -302,8 +343,8 @@ export class WalletCore {
         }
       )
 
-      // Сохраняем транзакцию в локальный журнал
-      await this.saveTransaction({
+      // Сохраняем транзакцию в локальный журнал (per-wallet)
+      await this.saveTransaction(signer.address, {
         hash: tx.hash,
         from: signer.address,
         to: validTo,
@@ -313,14 +354,15 @@ export class WalletCore {
         tokenSymbol: meta.symbol,
         tokenDecimals: meta.decimals,
         timestamp: Date.now(),
-        status: 'pending'
+        status: 'pending',
+        direction: 'out'
       })
 
       const receipt = await tx.wait()
       
       // Обновляем статус в журнале
       if (receipt) {
-        await this.updateTransactionStatus(tx.hash, receipt.status === 1 ? 'confirmed' : 'failed', receipt.blockNumber)
+        await this.updateTransactionStatus(signer.address, tx.hash, receipt.status === 1 ? 'confirmed' : 'failed', receipt.blockNumber)
       }
 
       return receipt
@@ -372,10 +414,15 @@ export class WalletCore {
       const meta = await this.erc20Meta(validTokenAddress)
       const tokenContract = this.token(validTokenAddress)
       const feeData = await this.provider().getFeeData()
+
+      // Get sender address so estimation simulates from the real wallet,
+      // not from address(0) which has 0 tokens and causes revert.
+      const from = await this.address(0)
       
       const gasLimit = await tokenContract.transfer.estimateGas(
         validTo,
-        parseUnits(amountHuman, meta.decimals)
+        parseUnits(amountHuman, meta.decimals),
+        { from }
       )
 
       const maxFee = feeData.maxFeePerGas || feeData.gasPrice || parseUnits('20', 'gwei')
@@ -397,11 +444,12 @@ export class WalletCore {
   }
 
   /**
-   * Сохраняет транзакцию в локальный журнал
+   * Сохраняет транзакцию в локальный журнал (per-wallet by address)
    */
-  private async saveTransaction(tx: TransactionInfo): Promise<void> {
+  private async saveTransaction(walletAddress: string, tx: TransactionInfo): Promise<void> {
     try {
-      const stored = await this.store.get(TRANSACTIONS_KEY)
+      const key = txKey(walletAddress)
+      const stored = await this.store.get(key)
       const transactions: TransactionInfo[] = stored ? JSON.parse(stored) : []
       
       transactions.unshift(tx) // Новые транзакции в начало
@@ -411,18 +459,19 @@ export class WalletCore {
         transactions.splice(1000)
       }
       
-      await this.store.set(TRANSACTIONS_KEY, JSON.stringify(transactions))
+      await this.store.set(key, JSON.stringify(transactions))
     } catch (error) {
       console.error('Save transaction error:', error)
     }
   }
 
   /**
-   * Обновляет статус транзакции
+   * Обновляет статус транзакции (per-wallet by address)
    */
-  private async updateTransactionStatus(hash: string, status: 'confirmed' | 'failed', blockNumber?: number): Promise<void> {
+  private async updateTransactionStatus(walletAddress: string, hash: string, status: 'confirmed' | 'failed', blockNumber?: number): Promise<void> {
     try {
-      const stored = await this.store.get(TRANSACTIONS_KEY)
+      const key = txKey(walletAddress)
+      const stored = await this.store.get(key)
       if (!stored) return
 
       const transactions: TransactionInfo[] = JSON.parse(stored)
@@ -433,7 +482,7 @@ export class WalletCore {
         if (blockNumber) {
           transactions[txIndex].blockNumber = blockNumber
         }
-        await this.store.set(TRANSACTIONS_KEY, JSON.stringify(transactions))
+        await this.store.set(key, JSON.stringify(transactions))
       }
     } catch (error) {
       console.error('Update transaction status error:', error)
@@ -441,10 +490,16 @@ export class WalletCore {
   }
 
   /**
-   * Получает локальные транзакции
+   * Получает локальные транзакции для конкретного адреса (per-wallet)
    */
-  async getLocalTransactions(): Promise<TransactionInfo[]> {
+  async getLocalTransactions(address?: string): Promise<TransactionInfo[]> {
     try {
+      // Per-wallet storage
+      if (address) {
+        const stored = await this.store.get(txKey(address))
+        return stored ? JSON.parse(stored) : []
+      }
+      // Legacy fallback — global key
       const stored = await this.store.get(TRANSACTIONS_KEY)
       return stored ? JSON.parse(stored) : []
     } catch (error) {
@@ -454,24 +509,109 @@ export class WalletCore {
   }
 
   /**
+   * Объединённая история транзакций: локальные (out) + incoming (in)
+   * Дедупликация по hash, сортировка по timestamp desc
+   */
+  async getTransactionHistory(address: string, limit = 50): Promise<TransactionInfo[]> {
+    try {
+      // 1. Получаем локальные (исходящие) транзакции
+      const local = await this.getLocalTransactions(address)
+      const localWithDir = local.map(tx => ({ ...tx, direction: (tx.direction || 'out') as 'in' | 'out' }))
+
+      // 2. Получаем входящие через Etherscan
+      const incoming = await this.getIncomingTransactions(address, limit)
+      const incomingWithDir = incoming.map(tx => ({ ...tx, direction: 'in' as const }))
+
+      // 3. Merge + deduplicate
+      const seen = new Set<string>()
+      const merged: TransactionInfo[] = []
+
+      for (const tx of [...localWithDir, ...incomingWithDir]) {
+        const key = this.txDedupKey(tx)
+        if (!seen.has(key)) {
+          seen.add(key)
+          merged.push(tx)
+        }
+      }
+
+      // 4. Sort by timestamp descending (newest first)
+      merged.sort((a, b) => b.timestamp - a.timestamp)
+
+      return merged.slice(0, limit)
+    } catch (error) {
+      console.error('Get transaction history error:', error)
+      return []
+    }
+  }
+
+  /**
+   * Получает реальный статус транзакции из блокчейна:
+   * confirmations, текущий блок, блок транзакции, статус
+   */
+  async getTransactionStatus(txHash: string): Promise<TransactionStatus> {
+    try {
+      const [receipt, currentBlock] = await Promise.all([
+        this.provider().getTransactionReceipt(txHash),
+        this.provider().getBlockNumber()
+      ])
+
+      if (!receipt) {
+        return {
+          hash: txHash,
+          confirmations: 0,
+          currentBlock,
+          txBlock: null,
+          status: 'pending'
+        }
+      }
+
+      const confirmations = currentBlock - receipt.blockNumber + 1
+
+      return {
+        hash: txHash,
+        confirmations,
+        currentBlock,
+        txBlock: receipt.blockNumber,
+        blockNumber: receipt.blockNumber,
+        status: receipt.status === 1 ? 'confirmed' : 'failed'
+      }
+    } catch (error) {
+      console.error('Get transaction status error:', error)
+      return {
+        hash: txHash,
+        confirmations: 0,
+        currentBlock: 0,
+        txBlock: null,
+        status: 'pending'
+      }
+    }
+  }
+
+  /**
    * Получает входящие транзакции через Etherscan API (если ключ предоставлен)
    */
   async getIncomingTransactions(address: string, limit = 50): Promise<TransactionInfo[]> {
     if (!this.etherscanApiKey) {
+      console.warn('ETHERSCAN_API_KEY is not set; incoming transactions are disabled')
       return []
     }
 
     try {
-      const url = `https://api.etherscan.io/api?module=account&action=txlist&address=${address}&startblock=0&endblock=99999999&page=1&offset=${limit}&sort=desc&apikey=${this.etherscanApiKey}`
-      
-      const response = await fetch(url)
-      const data = await response.json()
-      
-      if (data.status !== '1' || !Array.isArray(data.result)) {
-        return []
-      }
+      const normalizedAddress = address.toLowerCase()
+      const baseUrl = 'https://api.etherscan.io/api?module=account&address=' + address + '&startblock=0&endblock=99999999&page=1&offset=' + limit + '&sort=desc&apikey=' + this.etherscanApiKey
 
-      return data.result
+      const [ethResponse, erc20Response] = await Promise.all([
+        fetch(baseUrl + '&action=txlist'),
+        fetch(baseUrl + '&action=tokentx'),
+      ])
+
+      const [ethData, erc20Data] = await Promise.all([
+        ethResponse.json(),
+        erc20Response.json(),
+      ])
+
+      const incomingEth: TransactionInfo[] = Array.isArray(ethData?.result)
+        ? ethData.result
         .filter((tx: any) => tx.to?.toLowerCase() === address.toLowerCase())
         .map((tx: any): TransactionInfo => ({
           hash: tx.hash,
@@ -481,8 +621,41 @@ export class WalletCore {
           type: 'eth',
           timestamp: parseInt(tx.timeStamp) * 1000,
           status: tx.txreceipt_status === '1' ? 'confirmed' : 'failed',
-          blockNumber: parseInt(tx.blockNumber)
+          blockNumber: parseInt(tx.blockNumber),
+          direction: 'in'
         }))
+        : []
+
+      const incomingErc20: TransactionInfo[] = Array.isArray(erc20Data?.result)
+        ? erc20Data.result
+          .filter((tx: any) => tx.to?.toLowerCase() === normalizedAddress)
+          .filter((tx: any) => {
+            const tokenAddress = String(tx.contractAddress || '').toLowerCase()
+            return tokenAddress && this.incomingTokenWhitelist.has(tokenAddress)
+          })
+          .map((tx: any): TransactionInfo => {
+            const tokenDecimals = Number(tx.tokenDecimal || 18)
+            const safeDecimals = Number.isFinite(tokenDecimals) ? tokenDecimals : 18
+
+            return {
+              hash: tx.hash,
+              from: tx.from,
+              to: tx.to,
+              value: formatUnits(tx.value || '0', safeDecimals),
+              type: 'erc20',
+              tokenAddress: tx.contractAddress,
+              tokenSymbol: tx.tokenSymbol,
+              tokenDecimals: safeDecimals,
+              timestamp: parseInt(tx.timeStamp) * 1000,
+              status: tx.txreceipt_status === '0' ? 'failed' : 'confirmed',
+              blockNumber: parseInt(tx.blockNumber),
+              direction: 'in',
+              logIndex: Number(tx.logIndex),
+            }
+          })
+        : []
+
+      return [...incomingEth, ...incomingErc20]
     } catch (error) {
       console.error('Get incoming transactions error:', error)
       return []
@@ -491,9 +664,13 @@ export class WalletCore {
 
   /**
    * Очищает данные кошелька (сброс)
+   * Удаляет seed + legacy global transactions + per-wallet transactions
    */
-  async resetWallet(): Promise<void> {
+  async resetWallet(address?: string): Promise<void> {
     await this.store.remove(SEED_KEY)
     await this.store.remove(TRANSACTIONS_KEY)
+    if (address) {
+      await this.store.remove(txKey(address))
+    }
   }
 }
