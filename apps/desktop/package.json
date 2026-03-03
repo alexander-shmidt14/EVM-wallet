@@ -1,6 +1,6 @@
 {
   "name": "@app/desktop",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "EVM Wallet Desktop App",
   "main": "dist/main.js",
   "homepage": "./",
@@ -39,6 +39,8 @@
     "constants-browserify": "^1.0.0",
     "cross-fetch": "^4.0.0",
     "crypto-browserify": "^3.12.1",
+    "electron-log": "^5.4.3",
+    "electron-updater": "^6.8.3",
     "ethers": "^6.8.0",
     "events": "^3.3.0",
     "form-data": "^4.0.4",

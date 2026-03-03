@@ -2,7 +2,9 @@
 tags: [devops]
 related_files:
   - .github/workflows/windows-build.yml
-last_updated: 2026-03-02
+  - apps/desktop/electron-builder-nosign.json
+  - apps/desktop/src/backend/auto-updater.ts
+last_updated: 2026-03-03
 ---
 
 # Процесс релиза
@@ -33,16 +35,23 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-### 3. Автоматическая публикация
+### 3. Автоматическая публикация и развёртывание
 
-При push тега `v*` [[devops/windows-build|Windows Build]] автоматически:
+При push тага `v*` [[devops/windows-build|Windows Build]] автоматически:
 
-1. Собирает .exe installer
-2. Генерирует SHA256 checksums
+1. Собирает .exe installer (NSIS)
+2. Генерирует `latest.yml` metafile (для [[devops/auto-update|auto-updater]])
 3. Создаёт GitHub Release с:
-   - `.exe` файлом
-   - `SHA256SUMS.txt`
+   - `.exe` installer
+   - `latest.yml` (версия, хэш, URL для скачивания)
+   - `blockmap` (для дифференциальных обновлений)
    - Авто-генерированными release notes
+
+**Клиентское развёртывание:**
+- Установленные приложения версии < новой версии
+- Проверяют GitHub Releases каждые 30 минут
+- Видят диалог: "Доступна версия X.Y.Z"
+- [[devops/auto-update|Скачивают и устанавливают]] автоматически (с согласия пользователя)
 
 ### 4. Pre-release
 
@@ -65,12 +74,13 @@ Release будет создан с флагом `prerelease: true`.
 | Новая функциональность | `1.0.0` → `1.1.0` |
 | Bug fix | `1.0.0` → `1.0.1` |
 
-> Текущая версия: `1.0.0` (в `package.json`)
+**Текущая версия:** `1.1.0` (в `apps/desktop/package.json`)
 
 ---
 
 ## См. также
 
 - [[devops/windows-build|Windows Build]] — автосборка при теге
+- [[devops/auto-update|Авто-обновления]] — скачивание обновлений клиентами
 - [[devops/branching|Git-стратегия]] — модель ветвления
 - [[changelog/_index|Changelog]] — история изменений

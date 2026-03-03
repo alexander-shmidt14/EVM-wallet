@@ -25,9 +25,13 @@ const electronAPI = {
     ipcRenderer.invoke('wallet:estimateErc20Gas', tokenAddress, to, amount),
   
   // Transactions
-  getLocalTransactions: () => ipcRenderer.invoke('wallet:getLocalTransactions'),
+  getLocalTransactions: (address?: string) => ipcRenderer.invoke('wallet:getLocalTransactions', address),
   getIncomingTransactions: (address: string, limit?: number) => 
     ipcRenderer.invoke('wallet:getIncomingTransactions', address, limit),
+  getTransactionHistory: (address: string, limit?: number) =>
+    ipcRenderer.invoke('wallet:getTransactionHistory', address, limit),
+  getTransactionStatus: (txHash: string) =>
+    ipcRenderer.invoke('wallet:getTransactionStatus', txHash),
   
   // Seed phrase
   getSeedPhrase: () => ipcRenderer.invoke('wallet:getSeedPhrase'),
@@ -46,7 +50,14 @@ const electronAPI = {
   importNewWallet: (name: string, seedPhrase: string) => ipcRenderer.invoke('wallets:import', name, seedPhrase),
   selectWallet: (walletId: string) => ipcRenderer.invoke('wallets:select', walletId),
   deleteWallet: (walletId: string) => ipcRenderer.invoke('wallets:delete', walletId),
-  getActiveWalletId: () => ipcRenderer.invoke('wallets:getActiveId')
+  getActiveWalletId: () => ipcRenderer.invoke('wallets:getActiveId'),
+
+  // Updates
+  onUpdateProgress: (callback: (progress: { percent: number }) => void) => {
+    ipcRenderer.on('update-progress', (_, progress) => callback(progress))
+    // Return unsubscribe function
+    return () => ipcRenderer.removeAllListeners('update-progress')
+  }
 }
 
 // Expose the API to the renderer process

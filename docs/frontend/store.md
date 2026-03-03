@@ -54,6 +54,13 @@ last_updated: 2026-03-02
 | `isLoading` | `boolean` | Индикатор загрузки |
 | `error` | `string \| null` | Последняя ошибка |
 
+### История транзакций
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `transactions` | `TransactionInfo[]` | Объединённый список транзакций (входящие + исходящие) |
+| `isLoadingTransactions` | `boolean` | Индикатор загрузки истории |
+
 ---
 
 ## Actions
@@ -84,6 +91,7 @@ last_updated: 2026-03-02
 | `initialize()` | `auth:hasPassword`, `wallet:hasWallet`, `wallet:getAddress`, `wallets:getActiveId`, `wallets:list` | Полная инициализация при запуске |
 | `loadBalance()` | `wallet:getEthBalance`, `wallet:getErc20Balance` + CoinGecko fetch | Загрузка ETH + MMA балансов + USD. Авто-обновление каждые 30 сек |
 | `loadSeedPhrase()` | `wallet:getSeedPhrase` | Загрузка seed phrase по требованию |
+| `loadTransactions()` | `wallet:getTransactionHistory` | Загрузка объединённой истории (per-wallet, limit 50) |
 | `reset()` | `wallet:resetWallet` | Полный сброс кошелька |
 
 ---

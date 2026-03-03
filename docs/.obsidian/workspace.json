@@ -11,10 +11,10 @@
             "id": "4e782407736233bd",
             "type": "leaf",
             "state": {
-              "type": "empty",
+              "type": "graph",
               "state": {},
-              "icon": "lucide-file",
-              "title": "Новая вкладка"
+              "icon": "lucide-git-fork",
+              "title": "Граф"
             }
           }
         ]
@@ -90,6 +90,7 @@
             "state": {
               "type": "backlink",
               "state": {
+                "file": "backend/ipc-reference.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -99,7 +100,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Обратные ссылки"
+              "title": "Обратные ссылки для ipc-reference"
             }
           },
           {
@@ -108,11 +109,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
+                "file": "backend/ipc-reference.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Исходящие ссылки"
+              "title": "Исходящие ссылки из ipc-reference"
             }
           },
           {
@@ -150,12 +152,13 @@
             "state": {
               "type": "outline",
               "state": {
+                "file": "backend/ipc-reference.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Структура"
+              "title": "Структура ipc-reference"
             }
           }
         ]
@@ -178,6 +181,11 @@
   },
   "active": "4e782407736233bd",
   "lastOpenFiles": [
+    "changelog/2026-03-03.md",
+    "backend/transaction-history.md",
+    "devops/auto-update.md",
+    "backend/ipc-reference.md",
+    "backend/electron-main.md",
     "templates/ipc-handler-template.md",
     "templates/screen-template.md",
     "templates/changelog-entry-template.md",
@@ -202,13 +210,8 @@
     "frontend/screens/create-wallet.md",
     "frontend/_index.md",
     "frontend/store.md",
-    "frontend/components.md",
     "frontend/screens",
-    "frontend/app-flow.md",
     "frontend",
-    "devops/_index.md",
-    "devops/windows-build.md",
-    "devops/release.md",
     "devops",
     "changelog",
     "backend",

@@ -17,6 +17,7 @@ last_updated: 2026-03-02
 |----------|----------|
 | [[backend/electron-main\|Electron Main]] | Жизненный цикл, BrowserWindow, инициализация |
 | [[backend/ipc-reference\|Справочник IPC]] | Все 20+ IPC-каналов: auth, wallets, wallet |
+| [[backend/transaction-history\|История транзакций]] | Входящие + исходящие транзакции, Etherscan API |
 | [[backend/secure-store\|Secure Store]] | Зашифрованное JSON-хранилище (safeStorage) |
 | [[backend/preload\|Preload]] | contextBridge, маппинг electronAPI → IPC |
 

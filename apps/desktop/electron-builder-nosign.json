@@ -24,5 +24,10 @@
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true
   },
-  "forceCodeSigning": false
+  "forceCodeSigning": false,
+  "publish": {
+    "provider": "github",
+    "owner": "alexander-shmidt14",
+    "repo": "EVM-wallet"
+  }
 }
