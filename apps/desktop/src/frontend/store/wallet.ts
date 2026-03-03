@@ -1,4 +1,8 @@
 ﻿import { create } from 'zustand'
+import type { TransactionStatus } from '@wallet/wallet-core'
+
+// Re-export types from wallet-core for use in components
+export type { TransactionInfo, TransactionStatus } from '@wallet/wallet-core'
 
 interface ElectronAPI {
   // Auth
@@ -28,6 +32,7 @@ interface ElectronAPI {
   estimateErc20Gas: (tokenAddress: string, to: string, amount: string) => Promise<any>
   getLocalTransactions: () => Promise<any[]>
   getIncomingTransactions: (address: string, limit?: number) => Promise<any[]>
+  getTransactionStatus: (hash: string) => Promise<TransactionStatus>
   getSeedPhrase: () => Promise<string>
   resetWallet: () => Promise<void>
 }

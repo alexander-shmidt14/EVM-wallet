@@ -28,6 +28,8 @@ const electronAPI = {
   getLocalTransactions: () => ipcRenderer.invoke('wallet:getLocalTransactions'),
   getIncomingTransactions: (address: string, limit?: number) => 
     ipcRenderer.invoke('wallet:getIncomingTransactions', address, limit),
+  getTransactionStatus: (hash: string) => 
+    ipcRenderer.invoke('wallet:getTransactionStatus', hash),
   
   // Seed phrase
   getSeedPhrase: () => ipcRenderer.invoke('wallet:getSeedPhrase'),
