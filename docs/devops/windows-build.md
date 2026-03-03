@@ -4,7 +4,7 @@ related_files:
   - .github/workflows/windows-build.yml
   - apps/desktop/electron-builder-nosign.json
   - apps/desktop/release/installer.nsi
-last_updated: 2026-03-02
+last_updated: 2026-03-03
 ---
 
 # Windows Build
@@ -71,6 +71,15 @@ for ($i = 1; $i -le $maxRetries; $i++) {
 ```
 
 Причина: transient network EOF при скачивании Electron.
+
+## Build-time env для desktop main
+
+На шаге `Build main process` workflow передаёт env, которые вшиваются в `dist/main.js` через esbuild:
+- `ALCHEMY_RPC_MAINNET` / `INFURA_RPC_MAINNET`
+- `ETHERSCAN_API_KEY`
+- `INCOMING_ERC20_WHITELIST`
+
+Важно: `.env.example` — только шаблон. Для скачанного CI `.exe` используются значения из GitHub Actions Secrets/Variables.
 
 ## Unsigned build
 

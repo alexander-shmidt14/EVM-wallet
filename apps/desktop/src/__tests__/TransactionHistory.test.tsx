@@ -61,6 +61,22 @@ const mockErc20Tx: TransactionInfo = {
   blockNumber: 17999970,
 }
 
+const mockIncomingErc20Tx: TransactionInfo = {
+  hash: '0xincomingerc20456789012345678901234567890abcdef1234567890abcdef1234',
+  from: '0x6666666666666666666666666666666666666666',
+  to: '0x1111111111111111111111111111111111111111',
+  value: '42.5',
+  type: 'erc20',
+  tokenSymbol: 'MMA',
+  tokenAddress: '0xcA82d24A97b33F2d5826575f77fdc8Bdb82FC580',
+  tokenDecimals: 18,
+  status: 'confirmed',
+  timestamp: Date.now() - 1800000,
+  direction: 'in',
+  confirmations: 21,
+  blockNumber: 18000100,
+}
+
 const CURRENT_ADDRESS = '0x1111111111111111111111111111111111111111'
 
 // --- TransactionItem Tests ---
@@ -102,6 +118,18 @@ describe('TransactionItem', () => {
     )
     expect(screen.getByText('Sent MMA')).toBeInTheDocument()
     expect(screen.getByText(/-100/)).toBeInTheDocument()
+  })
+
+  it('renders incoming ERC-20 transaction correctly', () => {
+    render(
+      <TransactionItem
+        tx={mockIncomingErc20Tx}
+        currentAddress={CURRENT_ADDRESS}
+        onClick={jest.fn()}
+      />
+    )
+    expect(screen.getByText('Received MMA')).toBeInTheDocument()
+    expect(screen.getByText(/\+42\.5/)).toBeInTheDocument()
   })
 
   it('shows pending status with yellow badge', () => {
@@ -245,6 +273,17 @@ describe('TransactionDetailPopup', () => {
 
     expect(screen.getByText('Token Contract')).toBeInTheDocument()
     expect(screen.getByText(mockErc20Tx.tokenAddress!)).toBeInTheDocument()
+  })
+
+  it('renders incoming transaction direction in popup', async () => {
+    await act(async () => {
+      render(
+        <TransactionDetailPopup tx={mockIncomingErc20Tx} onClose={jest.fn()} />
+      )
+    })
+
+    expect(screen.getByText(/Received.*MMA/)).toBeInTheDocument()
+    expect(screen.getByText(/\+42\.5/)).toBeInTheDocument()
   })
 
   it('renders Etherscan link', async () => {
