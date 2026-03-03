@@ -24,6 +24,14 @@ log.transports.console.level = 'info'
 autoUpdater.logger = log
 autoUpdater.autoDownload = false
 
+// Explicitly set GitHub provider to use direct download URLs (no API rate limits)
+autoUpdater.setFeedURL({
+  provider: 'github',
+  owner: 'alexander-shmidt14',
+  repo: 'EVM-wallet',
+  private: false
+})
+
 let updateAvailableInfo: any = null
 
 /**
@@ -148,9 +156,9 @@ export const initAutoUpdater = (mainWindow: BrowserWindow): void => {
     dialog
       .showMessageBox(mainWindow, {
         type: 'error',
-        title: 'Update Check Failed',
-        message: 'Failed to check for updates',
-        detail: 'Please try again later or check your internet connection.',
+        title: 'Update Error',
+        message: 'Failed to download update',
+        detail: `Error: ${error.message}\n\nPlease try again later or check your internet connection.`,
         buttons: ['OK']
       })
       .catch((err: any) => {
