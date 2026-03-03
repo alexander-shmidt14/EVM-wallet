@@ -28,6 +28,7 @@
   "publish": {
     "provider": "github",
     "owner": "alexander-shmidt14",
-    "repo": "EVM-wallet"
+    "repo": "EVM-wallet",
+    "private": false
   }
 }
