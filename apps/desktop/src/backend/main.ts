@@ -230,6 +230,11 @@ ipcMain.handle('wallet:getIncomingTransactions', async (_, address: string, limi
   return walletCore.getIncomingTransactions(address, limit)
 })
 
+ipcMain.handle('wallet:getTransactionStatus', async (_, hash: string) => {
+  if (!walletCore) throw new Error('Wallet core not initialized')
+  return walletCore.getTransactionStatus(hash)
+})
+
 ipcMain.handle('wallet:getSeedPhrase', async () => {
   if (!walletCore) throw new Error('Wallet core not initialized')
   return walletCore.ensureSeed(false)

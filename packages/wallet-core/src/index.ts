@@ -60,6 +60,13 @@ export interface TransactionInfo {
   blockNumber?: number
 }
 
+export interface TransactionStatus {
+  hash: string
+  status: 'pending' | 'confirmed' | 'failed'
+  confirmations: number
+  blockNumber?: number
+}
+
 export class WalletCore {
   private _provider: JsonRpcProvider | null = null
 
@@ -486,6 +493,37 @@ export class WalletCore {
     } catch (error) {
       console.error('Get incoming transactions error:', error)
       return []
+    }
+  }
+
+  /**
+   * Получает статус транзакции из сети
+   */
+  async getTransactionStatus(hash: string): Promise<TransactionStatus> {
+    try {
+      const receipt = await this.provider().getTransactionReceipt(hash)
+      
+      if (!receipt) {
+        // Транзакция еще не подтверждена
+        return {
+          hash,
+          status: 'pending',
+          confirmations: 0
+        }
+      }
+
+      const currentBlock = await this.provider().getBlockNumber()
+      const confirmations = currentBlock - receipt.blockNumber + 1
+
+      return {
+        hash,
+        status: receipt.status === 1 ? 'confirmed' : 'failed',
+        confirmations,
+        blockNumber: receipt.blockNumber
+      }
+    } catch (error) {
+      console.error('Get transaction status error:', error)
+      throw error
     }
   }
 
