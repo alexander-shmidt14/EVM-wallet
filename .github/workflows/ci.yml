@@ -164,6 +164,9 @@ jobs:
       - name: Run tests with coverage
         run: pnpm -F @app/desktop test -- --passWithNoTests --ci --coverage --verbose
 
+      - name: Run Transaction History tests explicitly
+        run: pnpm -F @app/desktop test -- TransactionHistory.test.tsx --ci --verbose
+
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v4

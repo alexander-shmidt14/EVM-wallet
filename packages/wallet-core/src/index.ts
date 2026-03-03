@@ -584,7 +584,8 @@ export class WalletCore {
           type: 'eth',
           timestamp: parseInt(tx.timeStamp) * 1000,
           status: tx.txreceipt_status === '1' ? 'confirmed' : 'failed',
-          blockNumber: parseInt(tx.blockNumber)
+          blockNumber: parseInt(tx.blockNumber),
+          direction: 'in'
         }))
     } catch (error) {
       console.error('Get incoming transactions error:', error)

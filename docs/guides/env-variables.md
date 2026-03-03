@@ -60,12 +60,13 @@ ETHERSCAN_API_KEY=YOUR_ETHERSCAN_KEY
 
 Всё работает и без ключей:
 - RPC: PublicNode (бесплатный, без ключа, rate-limited)
-- Etherscan: входящие транзакции не загружаются (исходящие — по журналу)
+- **Etherscan:** входящие транзакции не загружаются, видны только исходящие (см. [[backend/transaction-history|История транзакций]])
 - Цена ETH: CoinGecko API (без ключа)
 
 ---
 
 ## См. также
 
+- [[backend/transaction-history|История транзакций]] — как работают входящие/исходящие
 - [[backend/electron-main|Electron Main]] — где переменные считываются
 - [[guides/getting-started|Быстрый старт]] — настройка проекта
