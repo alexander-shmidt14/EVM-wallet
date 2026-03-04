@@ -1,6 +1,6 @@
 {
   "name": "@app/desktop",
-  "version": "1.1.4",
+  "version": "1.1.3",
   "description": "EVM Wallet Desktop App",
   "main": "dist/main.js",
   "homepage": "./",

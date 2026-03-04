@@ -24,7 +24,7 @@ log.transports.console.level = 'info'
 autoUpdater.logger = log
 autoUpdater.autoDownload = false
 
-// Explicitly set GitHub provider — use direct download URLs (no API rate limits)
+// Explicitly set GitHub provider to use direct download URLs (no API rate limits)
 autoUpdater.setFeedURL({
   provider: 'github',
   owner: 'alexander-shmidt14',
@@ -157,7 +157,7 @@ export const initAutoUpdater = (mainWindow: BrowserWindow): void => {
       .showMessageBox(mainWindow, {
         type: 'error',
         title: 'Update Error',
-        message: 'Failed to download or check for updates',
+        message: 'Failed to download update',
         detail: `Error: ${error.message}\n\nPlease try again later or check your internet connection.`,
         buttons: ['OK']
       })
