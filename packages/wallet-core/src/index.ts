@@ -616,15 +616,15 @@ export class WalletCore {
         fetch(baseUrl + '&action=tokentx'),
       ])
 
-      console.log('[WalletCore:getIncoming] HTTP status — txlist:', ethResponse.status, '| tokentx:', erc20Response.status)
+      console.log('[WalletCore:getIncoming] HTTP status - txlist:', ethResponse.status, '| tokentx:', erc20Response.status)
 
       const [ethData, erc20Data] = await Promise.all([
         ethResponse.json(),
         erc20Response.json(),
       ])
 
-      console.log('[WalletCore:getIncoming] Etherscan txlist — status:', ethData?.status, '| message:', ethData?.message, '| result count:', Array.isArray(ethData?.result) ? ethData.result.length : 'NOT_ARRAY')
-      console.log('[WalletCore:getIncoming] Etherscan tokentx — status:', erc20Data?.status, '| message:', erc20Data?.message, '| result count:', Array.isArray(erc20Data?.result) ? erc20Data.result.length : 'NOT_ARRAY')
+      console.log('[WalletCore:getIncoming] Etherscan txlist - status:', ethData?.status, '| message:', ethData?.message, '| result count:', Array.isArray(ethData?.result) ? ethData.result.length : 'NOT_ARRAY')
+      console.log('[WalletCore:getIncoming] Etherscan tokentx - status:', erc20Data?.status, '| message:', erc20Data?.message, '| result count:', Array.isArray(erc20Data?.result) ? erc20Data.result.length : 'NOT_ARRAY')
 
       // Log raw first result for debugging
       if (Array.isArray(ethData?.result) && ethData.result.length > 0) {

@@ -29,7 +29,7 @@ const initWalletCore = () => {
   console.log('[InitWalletCore] RPC URL:', rpcUrl ? rpcUrl.replace(/\/v[23]\/.*/, '/v*/***') : '(empty, using publicnode)')
   console.log('[InitWalletCore] ETHERSCAN_API_KEY present:', !!etherscanApiKey, '| length:', (etherscanApiKey || '').length)
   console.log('[InitWalletCore] ETHERSCAN_API_KEY raw repr:', JSON.stringify(etherscanApiKey))
-  console.log('[InitWalletCore] INCOMING_ERC20_WHITELIST:', incomingTokenWhitelist.length > 0 ? incomingTokenWhitelist : '(empty → default MMA)')
+  console.log('[InitWalletCore] INCOMING_ERC20_WHITELIST:', incomingTokenWhitelist.length > 0 ? incomingTokenWhitelist : '(empty, default MMA)')
   // ── END DEBUG ──
 
   walletCore = new WalletCore(

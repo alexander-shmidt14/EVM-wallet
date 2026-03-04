@@ -392,7 +392,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       const outCount = transactions.filter((tx: any) => tx.direction === 'out').length
       console.log('[Store:loadTransactions] DONE |', transactions.length, 'total |', inCount, 'in |', outCount, 'out')
       if (inCount === 0) {
-        console.warn('[Store:loadTransactions] Zero incoming transactions — check main process logs for [WalletCore:getIncoming]')
+        console.warn('[Store:loadTransactions] Zero incoming transactions - check main process logs for [WalletCore:getIncoming]')
       }
       set({ transactions, isLoadingTransactions: false })
     } catch (error) {
