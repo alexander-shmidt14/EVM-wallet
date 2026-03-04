@@ -16,6 +16,7 @@
       }
     ],
     "icon": "assets/icon.ico",
+    "artifactName": "EVM-Wallet-Setup-${version}.exe",
     "verifyUpdateCodeSignature": false
   },
   "nsis": {

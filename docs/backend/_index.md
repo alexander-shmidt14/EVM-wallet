@@ -20,6 +20,7 @@ last_updated: 2026-03-02
 | [[backend/transaction-history\|История транзакций]] | Входящие + исходящие транзакции, Etherscan API |
 | [[backend/secure-store\|Secure Store]] | Зашифрованное JSON-хранилище (safeStorage) |
 | [[backend/preload\|Preload]] | contextBridge, маппинг electronAPI → IPC |
+| [[backend/auto-updater\|Auto-Updater]] | Модуль автообновлений (electron-updater) |
 
 ---
 

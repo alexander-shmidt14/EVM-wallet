@@ -5,7 +5,7 @@
 
 ; General
 Name "EVM Wallet"
-OutFile "EVM Wallet Setup 1.0.0.exe"
+OutFile "EVM-Wallet-Setup-1.1.6.exe"
 InstallDir "$LOCALAPPDATA\EVM Wallet"
 InstallDirRegKey HKCU "Software\EVMWallet" "InstallDir"
 RequestExecutionLevel user
