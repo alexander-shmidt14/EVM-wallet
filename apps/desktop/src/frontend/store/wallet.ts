@@ -380,13 +380,23 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   loadTransactions: async () => {
     try {
       const { currentAddress } = get()
-      if (!currentAddress) return
+      if (!currentAddress) {
+        console.log('[Store:loadTransactions] SKIP: no currentAddress')
+        return
+      }
 
+      console.log('[Store:loadTransactions] START | address:', currentAddress)
       set({ isLoadingTransactions: true })
       const transactions = await window.electronAPI.getTransactionHistory(currentAddress, 50)
+      const inCount = transactions.filter((tx: any) => tx.direction === 'in').length
+      const outCount = transactions.filter((tx: any) => tx.direction === 'out').length
+      console.log('[Store:loadTransactions] DONE |', transactions.length, 'total |', inCount, 'in |', outCount, 'out')
+      if (inCount === 0) {
+        console.warn('[Store:loadTransactions] Zero incoming transactions — check main process logs for [WalletCore:getIncoming]')
+      }
       set({ transactions, isLoadingTransactions: false })
     } catch (error) {
-      console.error('Failed to load transactions:', error)
+      console.error('[Store:loadTransactions] ERROR:', error)
       set({ isLoadingTransactions: false })
     }
   },

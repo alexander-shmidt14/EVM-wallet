@@ -25,6 +25,13 @@ const initWalletCore = () => {
     .map((address) => address.trim())
     .filter(Boolean)
 
+  // ── DEBUG: incoming-transactions diagnostics ──
+  console.log('[InitWalletCore] RPC URL:', rpcUrl ? rpcUrl.replace(/\/v[23]\/.*/, '/v*/***') : '(empty, using publicnode)')
+  console.log('[InitWalletCore] ETHERSCAN_API_KEY present:', !!etherscanApiKey, '| length:', (etherscanApiKey || '').length)
+  console.log('[InitWalletCore] ETHERSCAN_API_KEY raw repr:', JSON.stringify(etherscanApiKey))
+  console.log('[InitWalletCore] INCOMING_ERC20_WHITELIST:', incomingTokenWhitelist.length > 0 ? incomingTokenWhitelist : '(empty → default MMA)')
+  // ── END DEBUG ──
+
   walletCore = new WalletCore(
     rpcUrl,
     secureStore,
@@ -237,12 +244,23 @@ ipcMain.handle('wallet:getLocalTransactions', async (_, address?: string) => {
 
 ipcMain.handle('wallet:getIncomingTransactions', async (_, address: string, limit: number = 50) => {
   if (!walletCore) throw new Error('Wallet core not initialized')
-  return walletCore.getIncomingTransactions(address, limit)
+  console.log('[IPC:getIncomingTransactions] address:', address, '| limit:', limit)
+  const result = await walletCore.getIncomingTransactions(address, limit)
+  console.log('[IPC:getIncomingTransactions] result:', result.length, 'incoming txs')
+  return result
 })
 
 ipcMain.handle('wallet:getTransactionHistory', async (_, address: string, limit: number = 50) => {
   if (!walletCore) throw new Error('Wallet core not initialized')
-  return walletCore.getTransactionHistory(address, limit)
+  console.log('[IPC:getTransactionHistory] address:', address, '| limit:', limit)
+  const result = await walletCore.getTransactionHistory(address, limit)
+  const inCount = result.filter((tx: any) => tx.direction === 'in').length
+  const outCount = result.filter((tx: any) => tx.direction === 'out').length
+  console.log('[IPC:getTransactionHistory] result:', result.length, 'total |', inCount, 'in |', outCount, 'out')
+  if (result.length > 0) {
+    console.log('[IPC:getTransactionHistory] first tx sample:', JSON.stringify(result[0], null, 2))
+  }
+  return result
 })
 
 ipcMain.handle('wallet:getTransactionStatus', async (_, txHash: string) => {
