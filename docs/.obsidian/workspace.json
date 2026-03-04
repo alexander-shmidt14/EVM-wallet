@@ -181,9 +181,12 @@
   },
   "active": "4e782407736233bd",
   "lastOpenFiles": [
+    "backend/auto-updater.md",
+    "Без названия.canvas",
+    "2026-03-03.md",
+    "devops/auto-update.md",
     "changelog/2026-03-03.md",
     "backend/transaction-history.md",
-    "devops/auto-update.md",
     "backend/ipc-reference.md",
     "backend/electron-main.md",
     "templates/ipc-handler-template.md",
@@ -208,15 +211,12 @@
     "frontend/screens/login.md",
     "frontend/screens/import-wallet.md",
     "frontend/screens/create-wallet.md",
-    "frontend/_index.md",
-    "frontend/store.md",
     "frontend/screens",
     "frontend",
     "devops",
     "changelog",
     "backend",
     "architecture",
-    "Без названия.canvas",
     "Без названия.base"
   ]
 }
