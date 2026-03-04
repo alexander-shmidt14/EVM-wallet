@@ -1,6 +1,6 @@
 {
   "name": "@app/desktop",
-  "version": "1.0.0",
+  "version": "1.1.4",
   "description": "EVM Wallet Desktop App",
   "main": "dist/main.js",
   "homepage": "./",
@@ -125,6 +125,12 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
     },
-    "forceCodeSigning": false
+    "forceCodeSigning": false,
+    "publish": {
+      "provider": "github",
+      "owner": "alexander-shmidt14",
+      "repo": "EVM-wallet",
+      "private": false
+    }
   }
 }
