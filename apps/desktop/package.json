@@ -1,6 +1,6 @@
 {
   "name": "@app/desktop",
-  "version": "1.1.5",
+  "version": "1.1.6",
   "description": "EVM Wallet Desktop App",
   "main": "dist/main.js",
   "homepage": "./",
@@ -116,6 +116,7 @@
         }
       ],
       "icon": "assets/icon.ico",
+      "artifactName": "EVM-Wallet-Setup-${version}.exe",
       "sign": null,
       "verifyUpdateCodeSignature": false
     },

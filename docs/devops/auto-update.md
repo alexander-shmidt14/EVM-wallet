@@ -77,6 +77,15 @@ Publish configuration для GitHub:
 
 **Примечание:** Репозиторий публичный — токен в конфиге не нужен. При публикации релизов (тег `v*`) `GH_TOKEN` передаётся через переменную окружения в GitHub Actions (`secrets.GITHUB_TOKEN`), electron-builder подхватывает его автоматически.
 
+#### `artifactName` (критично для updater)
+
+В блоке `"win"` обоих конфигов задаётся:
+```json
+"artifactName": "EVM-Wallet-Setup-${version}.exe"
+```
+
+**Зачем:** без `artifactName` electron-builder генерирует имя installer-а из `productName` (например, `EVM Wallet Setup 1.1.6.exe` — с пробелами). `latest.yml` ссылается на это имя. При скачивании обновления пробелы вызывают URL-encoding mismatch, и updater не находит файл. Используя дефисы вместо пробелов, имя становится стабильным и предсказуемым.
+
 ### 3. GitHub Actions Workflow
 **Файл:** `.github/workflows/windows-build.yml`
 
@@ -190,7 +199,10 @@ git push origin v1.1.0
 - ✅ Открыть логи в `%APPDATA%/EVM Wallet/logs/main.log`
 - ✅ Перезапустить приложение
 
-### Скачивание зависает
+### Скачивание зависает / updater не находит .exe
+- ✅ Проверить что `artifactName` задан в конфиге electron-builder (`"EVM-Wallet-Setup-${version}.exe"`)
+- ✅ Проверить что `path` в `latest.yml` совпадает с реальным именем файла в GitHub Release
+- ✅ Убедиться что в имени нет пробелов (URL-encoding mismatch)
 - ✅ Проверить интернет-соединение
 - ✅ Проверить GitHub Release файлы (`.exe` и `latest.yml` на месте)
 - ✅ Проверить место на диске
