@@ -157,7 +157,7 @@ export const initAutoUpdater = (mainWindow: BrowserWindow): void => {
       .showMessageBox(mainWindow, {
         type: 'error',
         title: 'Update Error',
-        message: 'Failed to download update',
+        message: 'Failed to download or check for updates',
         detail: `Error: ${error.message}\n\nPlease try again later or check your internet connection.`,
         buttons: ['OK']
       })
