@@ -7,7 +7,7 @@ related_files:
   - packages/wallet-core/src/secure-store.ts
   - packages/wallet-core/src/erc20.abi.json
   - packages/wallet-core/package.json
-last_updated: 2026-03-02
+last_updated: 2026-03-05
 ---
 
 # wallet-core
@@ -22,11 +22,12 @@ last_updated: 2026-03-02
 - HD-кошелёк (BIP-39 / BIP-44)
 - ETH операции (баланс, отправка, газ)
 - ERC-20 операции (баланс, метаданные, отправка)
-- Журнал транзакций
+- Журнал транзакций (включая входящие через Etherscan V2 API)
+- Injectable logger (`WalletLogger`) для файлового логирования
 - MMA токен метаданные и ценообразование
 
 **Build:** `tsup` → `dist/index.js` + `dist/index.d.ts`
-**Зависимости:** `ethers ^6.8`, `cross-fetch`
+**Зависимости:** `ethers ^6.8`, `cross-fetch` (explicit named import)
 
 ---
 
@@ -36,11 +37,27 @@ last_updated: 2026-03-02
 
 ```typescript
 new WalletCore(
-  rpcUrl: string,            // JSON-RPC URL (Alchemy, Infura, PublicNode)
-  store: SecureStore,         // Реализация хранилища (Electron / RN)
-  etherscanApiKey?: string    // Для входящих транзакций
+  rpcUrl: string,                          // JSON-RPC URL (Alchemy, Infura, PublicNode)
+  store: SecureStore,                       // Реализация хранилища (Electron / RN)
+  etherscanApiKey?: string,                 // Для входящих транзакций (trimmed автоматически)
+  incomingTokenWhitelist?: string[],        // CSV адресов ERC-20 (default: [MMA_TOKEN_ADDRESS])
+  logger?: WalletLogger                     // Injectable logger (default: console)
 )
 ```
+
+> Конструктор автоматически вызывает `.trim()` на `etherscanApiKey` для защиты от `\r\n` (частая проблема на Windows).
+
+### Интерфейс `WalletLogger`
+
+```typescript
+export interface WalletLogger {
+  info: (...args: unknown[]) => void
+  warn: (...args: unknown[]) => void
+  error: (...args: unknown[]) => void
+}
+```
+
+Desktop передаёт `electron-log` (пишет в `%APPDATA%/@app/desktop/logs/main.log`). Mobile и тесты используют `console` (default).
 
 ### Методы
 
@@ -77,8 +94,8 @@ new WalletCore(
 | Метод | Параметры | Возврат | Описание |
 |-------|-----------|---------|----------|
 | `getLocalTransactions(address?)` | `string?` | `Promise<TransactionInfo[]>` | Локальный журнал. Per-wallet если указан address, иначе legacy `transactions_v1` |
-| `getIncomingTransactions(addr, limit?)` | `string, number` | `Promise<TransactionInfo[]>` | Etherscan API (входящие) |
-| `getTransactionHistory(address, limit?)` | `string, number` | `Promise<TransactionInfo[]>` | Объединённая история: local + incoming, дедупликация по hash, sorted by timestamp desc |
+| `getIncomingTransactions(addr, limit?)` | `string, number` | `Promise<TransactionInfo[]>` | Etherscan V2 API (входящие ETH + ERC-20 whitelist). `Promise.allSettled`, `URLSearchParams`, `chainid=1` |
+| `getTransactionHistory(address, limit?)` | `string, number` | `Promise<TransactionInfo[]>` | Объединённая история: local + incoming, дедупликация по `txDedupKey`, sorted by timestamp desc |
 | `getTransactionStatus(txHash)` | `string` | `Promise<TransactionStatus>` | Реальные данные из блокчейна: receipt + blockNumber → confirmations |
 
 ---
@@ -175,7 +192,8 @@ interface SecureStore {
 
 ## См. также
 
-- [[backend/ipc-reference|Справочник IPC]] — как main.ts вызывает WalletCore
+- [[backend/ipc-reference|Справочник IPC]] — как main.ts вызывает WalletCore (включая `wallet:getDiagnostics`, `wallet:testEtherscan`)
+- [[backend/transaction-history|История транзакций]] — Etherscan V2 API, диагностика, troubleshooting
 - [[backend/secure-store|Secure Store]] — реализация SecureStore для Electron
 - [[architecture/data-flow|Поток данных]] — WalletCore в контексте приложения
 - [[architecture/security|Безопасность]] — как хранится seed
