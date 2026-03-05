@@ -300,6 +300,7 @@ ipcMain.handle('wallet:testEtherscan', async (_, address: string) => {
   }
   try {
     const params = new URLSearchParams({
+      chainid: '1',
       module: 'account',
       action: 'txlist',
       address,
@@ -310,7 +311,7 @@ ipcMain.handle('wallet:testEtherscan', async (_, address: string) => {
       sort: 'desc',
       apikey: apiKey,
     })
-    const url = 'https://api.etherscan.io/api?' + params.toString()
+    const url = 'https://api.etherscan.io/v2/api?' + params.toString()
     log.info('[testEtherscan] URL:', url.replace(/apikey=[^&]+/, 'apikey=***'))
 
     const resp = await fetch(url)

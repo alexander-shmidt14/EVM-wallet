@@ -616,7 +616,9 @@ export class WalletCore {
       const normalizedAddress = address.toLowerCase()
 
       // Build URLs with URLSearchParams for proper encoding
+      // Etherscan V2 API: use /v2/api base path with chainid parameter
       const commonParams = {
+        chainid: '1',
         module: 'account',
         address,
         startblock: '0',
@@ -627,8 +629,8 @@ export class WalletCore {
         apikey: this.etherscanApiKey,
       }
 
-      const ethUrl = 'https://api.etherscan.io/api?' + new URLSearchParams({ ...commonParams, action: 'txlist' }).toString()
-      const erc20Url = 'https://api.etherscan.io/api?' + new URLSearchParams({ ...commonParams, action: 'tokentx' }).toString()
+      const ethUrl = 'https://api.etherscan.io/v2/api?' + new URLSearchParams({ ...commonParams, action: 'txlist' }).toString()
+      const erc20Url = 'https://api.etherscan.io/v2/api?' + new URLSearchParams({ ...commonParams, action: 'tokentx' }).toString()
 
       this.log.info('[WalletCore:getIncoming] Fetching ETH:', ethUrl.replace(/apikey=[^&]+/, 'apikey=***'))
       this.log.info('[WalletCore:getIncoming] Fetching ERC20:', erc20Url.replace(/apikey=[^&]+/, 'apikey=***'))
