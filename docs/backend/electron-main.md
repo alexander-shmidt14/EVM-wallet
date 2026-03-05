@@ -3,7 +3,7 @@ tags: [backend]
 related_files:
   - apps/desktop/src/backend/main.ts
   - apps/desktop/src/backend/auto-updater.ts
-last_updated: 2026-03-03
+last_updated: 2026-03-05
 ---
 
 # Electron Main Process
@@ -14,7 +14,7 @@ last_updated: 2026-03-03
 
 ## Файл
 
-`apps/desktop/src/backend/main.ts` (236 строк)
+`apps/desktop/src/backend/main.ts` (~336 строк)
 
 ## Жизненный цикл
 
@@ -59,14 +59,36 @@ new BrowserWindow({
 ## Инициализация WalletCore
 
 ```typescript
+import log from 'electron-log'
+import fetch from 'cross-fetch'
+import { WalletCore } from '@wallet/wallet-core'
+
 const rpcUrl = process.env.ALCHEMY_RPC_MAINNET
            || process.env.INFURA_RPC_MAINNET
            || 'https://ethereum.publicnode.com'    // fallback
 
-walletCore = new WalletCore(rpcUrl, secureStore, etherscanApiKey)
+const etherscanApiKey = process.env.ETHERSCAN_API_KEY
+const incomingTokenWhitelist = (process.env.INCOMING_ERC20_WHITELIST || '')
+  .split(',').map(a => a.trim()).filter(Boolean)
+
+walletCore = new WalletCore(
+  rpcUrl,
+  secureStore,
+  etherscanApiKey,
+  incomingTokenWhitelist.length > 0 ? incomingTokenWhitelist : undefined,
+  log                      // ← injectable logger (electron-log)
+)
 ```
 
 Приоритет RPC: Alchemy → Infura → PublicNode (бесплатный).
+
+### Логирование (v1.1.6+)
+
+Мain process использует `electron-log` — логи пишутся в:
+- `%APPDATA%/@app/desktop/logs/main.log` (файл)
+- Console (для `npm run dev`)
+
+`WalletCore` получает `electron-log` как `WalletLogger`, поэтому все `[WalletCore:getIncoming]` логи видны в main.log.
 
 ## Инициализация Auto-Updater
 
@@ -105,7 +127,7 @@ if (!isDevelopment && mainWindow) {
 Группы:
 - `auth:*` — 3 хендлера (аутентификация)
 - `wallets:*` — 6 хендлеров (мульти-кошелёк)
-- `wallet:*` — 14 хендлеров (операции с кошельком)
+- `wallet:*` — 16 хендлеров (операции + диагностика: `getDiagnostics`, `testEtherscan`)
 
 ---
 

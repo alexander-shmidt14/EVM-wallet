@@ -2,7 +2,7 @@
 tags: [backend]
 related_files:
   - apps/desktop/src/backend/preload.ts
-last_updated: 2026-03-02
+last_updated: 2026-03-05
 ---
 
 # Preload
@@ -13,7 +13,7 @@ last_updated: 2026-03-02
 
 ## Файл
 
-`apps/desktop/src/backend/preload.ts` (~60 строк)
+`apps/desktop/src/backend/preload.ts` (~76 строк)
 
 ## Назначение
 
@@ -56,10 +56,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Transactions
   getLocalTransactions:    () => ipcRenderer.invoke('wallet:getLocalTransactions'),
   getIncomingTransactions: (addr, limit) => ipcRenderer.invoke('wallet:getIncomingTransactions', addr, limit),
+  getTransactionHistory:   (addr, limit) => ipcRenderer.invoke('wallet:getTransactionHistory', addr, limit),
+  getTransactionStatus:    (txHash) => ipcRenderer.invoke('wallet:getTransactionStatus', txHash),
 
   // Seed / Reset
   getSeedPhrase:    () => ipcRenderer.invoke('wallet:getSeedPhrase'),
   resetWallet:      () => ipcRenderer.invoke('wallet:resetWallet'),
+
+  // Updates
+  onUpdateProgress: (cb) => ipcRenderer.on('update-progress', (_, p) => cb(p)),
+
+  // Diagnostics (v1.1.6+)
+  getDiagnostics:   () => ipcRenderer.invoke('wallet:getDiagnostics'),
+  testEtherscan:    (addr) => ipcRenderer.invoke('wallet:testEtherscan', addr),
 })
 ```
 

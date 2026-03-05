@@ -2,7 +2,8 @@
 tags: [guides]
 related_files:
   - apps/desktop/src/backend/main.ts
-last_updated: 2026-03-03
+  - apps/desktop/esbuild.main.mjs
+last_updated: 2026-03-05
 ---
 
 # Переменные окружения
@@ -21,7 +22,7 @@ last_updated: 2026-03-03
 |-----------|-------------|---------|----------|
 | `ALCHEMY_RPC_MAINNET` | Нет | `https://ethereum.publicnode.com` | JSON-RPC URL для Ethereum Mainnet (Alchemy) |
 | `INFURA_RPC_MAINNET` | Нет | PublicNode | JSON-RPC URL (Infura) — backup |
-| `ETHERSCAN_API_KEY` | Нет | — | API ключ Etherscan для входящих транзакций |
+| `ETHERSCAN_API_KEY` | Нет | — | API ключ Etherscan V2 (единый для всех 60+ сетей) — для входящих транзакций |
 | `INCOMING_ERC20_WHITELIST` | Нет | MMA token | CSV whitelist адресов контрактов для входящих ERC-20 |
 | `NODE_ENV` | Нет | `development` | Build mode. CI использует `production` |
 
@@ -80,6 +81,8 @@ INCOMING_ERC20_WHITELIST=0xcA82d24A97b33F2d5826575f77fdc8Bdb82FC580
 Всё работает и без ключей:
 - RPC: PublicNode (бесплатный, без ключа, rate-limited)
 - **Etherscan:** входящие транзакции не загружаются, видны только исходящие (см. [[backend/transaction-history|История транзакций]])
+
+> ℹ️ С 2025-08-15 Etherscan отключил V1 API. Проект использует **V2** (`api.etherscan.io/v2/api` + `chainid=1`). Один Etherscan API key работает для всех сетей.
 - Цена ETH: CoinGecko API (без ключа)
 
 ---

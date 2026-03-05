@@ -3,7 +3,7 @@ tags: [backend, api]
 related_files:
   - apps/desktop/src/backend/main.ts
   - apps/desktop/src/backend/preload.ts
-last_updated: 2026-03-02
+last_updated: 2026-03-05
 ---
 
 # Справочник IPC-каналов
@@ -73,8 +73,15 @@ last_updated: 2026-03-02
 |-------|-----------|---------|----------|
 | `wallet:getLocalTransactions` | `address?: string` | `TransactionInfo[]` | Локальный журнал отправленных tx (per-wallet если указан address) |
 | `wallet:getIncomingTransactions` | `address, limit?` | `TransactionInfo[]` | Входящие tx через Etherscan API |
-| `wallet:getTransactionHistory` | `address: string, limit?: number` | `TransactionInfo[]` | Объединённая история: local (исходящие) + Etherscan (входящие), дедупликация по hash, сортировка по timestamp desc |
+| `wallet:getTransactionHistory` | `address: string, limit?: number` | `TransactionInfo[]` | Объединённая история: local (исходящие) + Etherscan V2 (входящие), дедупликация по `txDedupKey`, сортировка по timestamp desc |
 | `wallet:getTransactionStatus` | `txHash: string` | `TransactionStatus` | Реальный статус из блокчейна: confirmations, текущий/tx блок, статус |
+
+### Диагностика (добавлено v1.1.6)
+
+| Канал | Параметры | Возврат | Описание |
+|-------|-----------|---------|----------|
+| `wallet:getDiagnostics` | — | `{etherscanKeyPresent, etherscanKeyLength, etherscanKeyTrimmedLength, rpcUrl, whitelistCount, whitelistAddresses, logPath}` | Конфигурация main-процесса для отладки в DevTools |
+| `wallet:testEtherscan` | `address: string` | `{ok, status, message, resultType, resultCount, firstResult, rawResult?, error?}` | Тестовый запрос к Etherscan V2 API — проверяет работу ключа |
 
 ---
 
@@ -95,6 +102,7 @@ interface TransactionInfo {
   blockNumber?: number
   direction?: 'in' | 'out'       // Направление транзакции
   confirmations?: number          // Количество подтверждений
+  logIndex?: number               // Для ERC-20 дедупликации (из Etherscan)
 }
 
 interface TransactionStatus {
@@ -111,5 +119,6 @@ interface TransactionStatus {
 
 - [[backend/preload|Preload]] — маппинг каналов на electronAPI
 - [[frontend/store|Zustand Store]] — какие actions вызывают какие каналы
-- [[packages/wallet-core|wallet-core]] — реализация на стороне WalletCore
+- [[packages/wallet-core|wallet-core]] — реализация на стороне WalletCore (WalletLogger)
+- [[backend/transaction-history|История транзакций]] — Etherscan V2 API, диагностика
 - [[architecture/data-flow|Поток данных]] — визуализация IPC потока
