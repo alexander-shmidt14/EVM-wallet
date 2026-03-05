@@ -2,7 +2,7 @@
 tags: [frontend]
 related_files:
   - apps/desktop/src/frontend/store/wallet.ts
-last_updated: 2026-03-02
+last_updated: 2026-03-05
 ---
 
 # Zustand Store
@@ -13,7 +13,7 @@ last_updated: 2026-03-02
 
 ## Файл
 
-`apps/desktop/src/frontend/store/wallet.ts` (375 строк)
+`apps/desktop/src/frontend/store/wallet.ts` (~460 строк)
 
 ## Обзор
 
@@ -91,7 +91,7 @@ last_updated: 2026-03-02
 | `initialize()` | `auth:hasPassword`, `wallet:hasWallet`, `wallet:getAddress`, `wallets:getActiveId`, `wallets:list` | Полная инициализация при запуске |
 | `loadBalance()` | `wallet:getEthBalance`, `wallet:getErc20Balance` + CoinGecko fetch | Загрузка ETH + MMA балансов + USD. Авто-обновление каждые 30 сек |
 | `loadSeedPhrase()` | `wallet:getSeedPhrase` | Загрузка seed phrase по требованию |
-| `loadTransactions()` | `wallet:getTransactionHistory` | Загрузка объединённой истории (per-wallet, limit 50) |
+| `loadTransactions()` | `wallet:getDiagnostics`, `wallet:testEtherscan`, `wallet:getTransactionHistory` | Загрузка объединённой истории (per-wallet, limit 50). Автодиагностика в DevTools Console |
 | `reset()` | `wallet:resetWallet` | Полный сброс кошелька |
 
 ---
@@ -114,7 +114,8 @@ const MMA_PRICE_USD = 55
 
 ## См. также
 
-- [[backend/ipc-reference|Справочник IPC]] — все каналы, которые вызывает store
+- [[backend/ipc-reference|Справочник IPC]] — все каналы, которые вызывает store (вкл. `getDiagnostics`, `testEtherscan`)
+- [[backend/transaction-history|История транзакций]] — Etherscan V2 API, диагностика в DevTools
 - [[frontend/app-flow|Маршрутизация]] — `initialize()` при запуске
 - [[frontend/screens/_index|Экраны]] — какие экраны используют какие actions
 - [[packages/wallet-core|wallet-core API]] — реализация на стороне main
