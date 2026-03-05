@@ -57,7 +57,11 @@ const electronAPI = {
     ipcRenderer.on('update-progress', (_, progress) => callback(progress))
     // Return unsubscribe function
     return () => ipcRenderer.removeAllListeners('update-progress')
-  }
+  },
+
+  // Diagnostics (visible in renderer DevTools)
+  getDiagnostics: () => ipcRenderer.invoke('wallet:getDiagnostics'),
+  testEtherscan: (address: string) => ipcRenderer.invoke('wallet:testEtherscan', address),
 }
 
 // Expose the API to the renderer process

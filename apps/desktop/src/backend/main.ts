@@ -1,9 +1,15 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { createHash } from 'crypto'
+import log from 'electron-log'
+import fetch from 'cross-fetch'
 import { WalletCore } from '@wallet/wallet-core'
 import { secureStore } from './secure-store'
 import { initAutoUpdater } from './auto-updater'
+
+// Configure electron-log for main process diagnostics
+log.transports.file.level = 'info'
+log.transports.console.level = 'info'
 
 // Keep a global reference of the window object
 let mainWindow: BrowserWindow | null = null
@@ -25,11 +31,17 @@ const initWalletCore = () => {
     .map((address) => address.trim())
     .filter(Boolean)
 
+  // Log config to file (visible in %APPDATA%/EVM Wallet/logs/main.log)
+  log.info('[InitWalletCore] RPC URL:', rpcUrl ? rpcUrl.replace(/\/v[23]\/.*/, '/v*/***') : '(empty, using publicnode)')
+  log.info('[InitWalletCore] ETHERSCAN_API_KEY present:', !!etherscanApiKey, '| length:', (etherscanApiKey || '').length)
+  log.info('[InitWalletCore] INCOMING_ERC20_WHITELIST:', incomingTokenWhitelist.length > 0 ? incomingTokenWhitelist : '(empty, default MMA)')
+
   walletCore = new WalletCore(
     rpcUrl,
     secureStore,
     etherscanApiKey,
-    incomingTokenWhitelist.length > 0 ? incomingTokenWhitelist : undefined
+    incomingTokenWhitelist.length > 0 ? incomingTokenWhitelist : undefined,
+    log
   )
 }
 
@@ -258,4 +270,67 @@ ipcMain.handle('wallet:getSeedPhrase', async () => {
 ipcMain.handle('wallet:resetWallet', async () => {
   if (!walletCore) throw new Error('Wallet core not initialized')
   return walletCore.resetWallet()
+})
+
+// ── Diagnostics IPC (visible in renderer DevTools) ──────────────
+ipcMain.handle('wallet:getDiagnostics', async () => {
+  const etherscanApiKey = process.env.ETHERSCAN_API_KEY
+  const rpcUrl = process.env.ALCHEMY_RPC_MAINNET || process.env.INFURA_RPC_MAINNET || 'https://ethereum.publicnode.com'
+  const whitelist = (process.env.INCOMING_ERC20_WHITELIST || '')
+    .split(',')
+    .map((a: string) => a.trim())
+    .filter(Boolean)
+
+  return {
+    etherscanKeyPresent: !!etherscanApiKey,
+    etherscanKeyLength: (etherscanApiKey || '').length,
+    etherscanKeyTrimmedLength: (etherscanApiKey || '').trim().length,
+    rpcUrl: rpcUrl ? rpcUrl.replace(/\/v[23]\/.*/, '/v*/***') : '(empty)',
+    whitelistCount: whitelist.length,
+    whitelistAddresses: whitelist.map((a: string) => a.slice(0, 10) + '...'),
+    logPath: log.transports.file.getFile()?.path || 'unknown',
+  }
+})
+
+// ── Etherscan test IPC (single API call to verify key works) ────
+ipcMain.handle('wallet:testEtherscan', async (_, address: string) => {
+  const apiKey = (process.env.ETHERSCAN_API_KEY || '').trim()
+  if (!apiKey) {
+    return { ok: false, error: 'ETHERSCAN_API_KEY is empty' }
+  }
+  try {
+    const params = new URLSearchParams({
+      chainid: '1',
+      module: 'account',
+      action: 'txlist',
+      address,
+      startblock: '0',
+      endblock: '99999999',
+      page: '1',
+      offset: '3',
+      sort: 'desc',
+      apikey: apiKey,
+    })
+    const url = 'https://api.etherscan.io/v2/api?' + params.toString()
+    log.info('[testEtherscan] URL:', url.replace(/apikey=[^&]+/, 'apikey=***'))
+
+    const resp = await fetch(url)
+    const data = await resp.json()
+    log.info('[testEtherscan] Response:', JSON.stringify(data).slice(0, 500))
+
+    return {
+      ok: data?.status === '1',
+      status: data?.status,
+      message: data?.message,
+      resultType: Array.isArray(data?.result) ? 'array' : typeof data?.result,
+      resultCount: Array.isArray(data?.result) ? data.result.length : 0,
+      firstResult: Array.isArray(data?.result) && data.result.length > 0
+        ? { hash: data.result[0].hash, from: data.result[0].from, to: data.result[0].to }
+        : null,
+      rawResult: typeof data?.result === 'string' ? data.result : undefined,
+    }
+  } catch (err: any) {
+    log.error('[testEtherscan] ERROR:', err)
+    return { ok: false, error: String(err?.message || err) }
+  }
 })
