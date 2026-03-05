@@ -514,17 +514,13 @@ export class WalletCore {
    */
   async getTransactionHistory(address: string, limit = 50): Promise<TransactionInfo[]> {
     try {
-      console.log('[WalletCore:getHistory] START | address:', address, '| limit:', limit)
-
-      // 1. Получаем локальные (исходящие) транзакции
+      // 1. Get local (outgoing) transactions
       const local = await this.getLocalTransactions(address)
       const localWithDir = local.map(tx => ({ ...tx, direction: (tx.direction || 'out') as 'in' | 'out' }))
-      console.log('[WalletCore:getHistory] local txs:', local.length)
 
-      // 2. Получаем входящие через Etherscan
+      // 2. Get incoming via Etherscan
       const incoming = await this.getIncomingTransactions(address, limit)
       const incomingWithDir = incoming.map(tx => ({ ...tx, direction: 'in' as const }))
-      console.log('[WalletCore:getHistory] incoming txs:', incoming.length)
 
       // 3. Merge + deduplicate
       const seen = new Set<string>()
@@ -541,9 +537,7 @@ export class WalletCore {
       // 4. Sort by timestamp descending (newest first)
       merged.sort((a, b) => b.timestamp - a.timestamp)
 
-      const result = merged.slice(0, limit)
-      console.log('[WalletCore:getHistory] DONE | merged:', merged.length, '| returned:', result.length, '| in:', result.filter(t => t.direction === 'in').length, '| out:', result.filter(t => t.direction === 'out').length)
-      return result
+      return merged.slice(0, limit)
     } catch (error) {
       console.error('[WalletCore:getHistory] ERROR:', error)
       return []
@@ -597,11 +591,8 @@ export class WalletCore {
    * Получает входящие транзакции через Etherscan API (если ключ предоставлен)
    */
   async getIncomingTransactions(address: string, limit = 50): Promise<TransactionInfo[]> {
-    console.log('[WalletCore:getIncoming] START | address:', address, '| apiKey present:', !!this.etherscanApiKey, '| apiKey length:', (this.etherscanApiKey || '').length)
-    console.log('[WalletCore:getIncoming] whitelist:', [...this.incomingTokenWhitelist])
-
     if (!this.etherscanApiKey) {
-      console.warn('[WalletCore:getIncoming] ABORT: ETHERSCAN_API_KEY is falsy. Raw repr:', JSON.stringify(this.etherscanApiKey))
+      console.warn('[WalletCore:getIncoming] ETHERSCAN_API_KEY is not set; incoming transactions disabled')
       return []
     }
 
@@ -609,32 +600,26 @@ export class WalletCore {
       const normalizedAddress = address.toLowerCase()
       const baseUrl = 'https://api.etherscan.io/api?module=account&address=' + address + '&startblock=0&endblock=99999999&page=1&offset=' + limit + '&sort=desc&apikey=' + this.etherscanApiKey
 
-      console.log('[WalletCore:getIncoming] Fetching Etherscan: txlist + tokentx for', normalizedAddress)
-
       const [ethResponse, erc20Response] = await Promise.all([
         fetch(baseUrl + '&action=txlist'),
         fetch(baseUrl + '&action=tokentx'),
       ])
-
-      console.log('[WalletCore:getIncoming] HTTP status - txlist:', ethResponse.status, '| tokentx:', erc20Response.status)
 
       const [ethData, erc20Data] = await Promise.all([
         ethResponse.json(),
         erc20Response.json(),
       ])
 
-      console.log('[WalletCore:getIncoming] Etherscan txlist - status:', ethData?.status, '| message:', ethData?.message, '| result count:', Array.isArray(ethData?.result) ? ethData.result.length : 'NOT_ARRAY')
-      console.log('[WalletCore:getIncoming] Etherscan tokentx - status:', erc20Data?.status, '| message:', erc20Data?.message, '| result count:', Array.isArray(erc20Data?.result) ? erc20Data.result.length : 'NOT_ARRAY')
-
-      // Log raw first result for debugging
-      if (Array.isArray(ethData?.result) && ethData.result.length > 0) {
-        const sample = ethData.result[0]
-        console.log('[WalletCore:getIncoming] txlist sample[0]:', JSON.stringify({ hash: sample.hash, from: sample.from, to: sample.to, value: sample.value, txreceipt_status: sample.txreceipt_status }))
+      // Validate Etherscan responses
+      if (ethData?.status === '0' && ethData?.message !== 'No transactions found') {
+        console.error('[WalletCore:getIncoming] Etherscan txlist error:', ethData?.message, ethData?.result)
+      }
+      if (erc20Data?.status === '0' && erc20Data?.message !== 'No transactions found') {
+        console.error('[WalletCore:getIncoming] Etherscan tokentx error:', erc20Data?.message, erc20Data?.result)
       }
 
       const allEthTxs = Array.isArray(ethData?.result) ? ethData.result : []
       const ethToMe = allEthTxs.filter((tx: any) => tx.to?.toLowerCase() === normalizedAddress)
-      console.log('[WalletCore:getIncoming] ETH txs total:', allEthTxs.length, '| to my address:', ethToMe.length)
 
       const incomingEth: TransactionInfo[] = ethToMe
         .map((tx: any): TransactionInfo => ({
@@ -655,13 +640,6 @@ export class WalletCore {
         const tokenAddr = String(tx.contractAddress || '').toLowerCase()
         return tokenAddr && this.incomingTokenWhitelist.has(tokenAddr)
       })
-      console.log('[WalletCore:getIncoming] ERC-20 txs total:', allErc20Txs.length, '| to my address:', erc20ToMe.length, '| after whitelist:', erc20Whitelisted.length)
-
-      if (erc20ToMe.length > 0 && erc20Whitelisted.length === 0) {
-        const sampleTokens = [...new Set(erc20ToMe.slice(0, 5).map((tx: any) => tx.contractAddress?.toLowerCase()))]
-        console.warn('[WalletCore:getIncoming] All ERC-20 filtered out by whitelist! Sample token addresses:', sampleTokens)
-        console.warn('[WalletCore:getIncoming] Whitelist contains:', [...this.incomingTokenWhitelist])
-      }
 
       const incomingErc20: TransactionInfo[] = erc20Whitelisted
           .map((tx: any): TransactionInfo => {
@@ -685,7 +663,6 @@ export class WalletCore {
             }
           })
 
-      console.log('[WalletCore:getIncoming] DONE | returning:', incomingEth.length, 'ETH +', incomingErc20.length, 'ERC-20 =', incomingEth.length + incomingErc20.length, 'total')
       return [...incomingEth, ...incomingErc20]
     } catch (error) {
       console.error('[WalletCore:getIncoming] ERROR:', error)
