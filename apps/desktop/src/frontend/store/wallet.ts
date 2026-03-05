@@ -395,17 +395,20 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       // Diagnostics: fetch main-process config and log to DevTools
       try {
         const diag = await window.electronAPI.getDiagnostics()
-        console.log('[Diagnostics] etherscanKeyPresent:', diag.etherscanKeyPresent,
-          '| keyLength:', diag.etherscanKeyLength,
-          '| rpcUrl:', diag.rpcUrl,
-          '| whitelistCount:', diag.whitelistCount,
-          '| whitelist:', diag.whitelistAddresses,
-          '| logPath:', diag.logPath)
+        console.log(
+          '[Diagnostics]',
+          'keyPresent:', diag.etherscanKeyPresent,
+          '| keyLen:', diag.etherscanKeyLength,
+          '| rpc:', diag.rpcUrl,
+          '| wl:', diag.whitelistCount,
+          '| addrs:', diag.whitelistAddresses,
+          '| log:', diag.logPath,
+        )
         if (!diag.etherscanKeyPresent) {
-          console.error('[Diagnostics] ETHERSCAN_API_KEY is EMPTY in main process -- incoming transactions will NOT work. Check GitHub Secrets and rebuild.')
+          console.error('[Diagnostics] ETHERSCAN_API_KEY is EMPTY — incoming txs will not work')
         }
       } catch (diagErr) {
-        console.warn('[Diagnostics] Failed to fetch:', diagErr)
+        console.warn('[Diagnostics] fetch failed:', diagErr)
       }
 
       const transactions = await window.electronAPI.getTransactionHistory(currentAddress, 50)
@@ -442,10 +445,3 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     }
   },
 }))
-return merged.slice(0, limit)// 1. Get local (outgoing) transactions
-      const local = await this.getLocalTransactions(address)
-      const localWithDir = local.map(tx => ({ ...tx, direction: (tx.direction || 'out') as 'in' | 'out' }))
-
-      // 2. Get incoming via Etherscan
-      const incoming = await this.getIncomingTransactions(address, limit)
-      const incomingWithDir = incoming.map(tx => ({ ...tx, direction: 'in' as const })
