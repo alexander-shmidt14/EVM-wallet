@@ -1,8 +1,15 @@
 import { JsonRpcProvider, HDNodeWallet, Contract, formatEther, formatUnits, parseUnits, getAddress, TransactionReceipt, TransactionRequest } from 'ethers'
 import type { SecureStore } from './secure-store'
 import erc20Abi from './erc20.abi.json'
-import 'cross-fetch/polyfill'
+import fetch from 'cross-fetch'
 import { MMA_TOKEN_ADDRESS } from './meta'
+
+/** Injectable logger interface — defaults to console */
+export interface WalletLogger {
+  info: (...args: unknown[]) => void
+  warn: (...args: unknown[]) => void
+  error: (...args: unknown[]) => void
+}
 
 // Re-export types
 export type { SecureStore } from './secure-store'
@@ -81,13 +88,20 @@ export interface TransactionStatus {
 export class WalletCore {
   private _provider: JsonRpcProvider | null = null
   private incomingTokenWhitelist: Set<string>
+  private log: WalletLogger
 
   constructor(
     private rpcUrl: string, 
     private store: SecureStore,
     private etherscanApiKey?: string,
-    incomingTokenWhitelist: string[] = [MMA_TOKEN_ADDRESS]
+    incomingTokenWhitelist: string[] = [MMA_TOKEN_ADDRESS],
+    logger?: WalletLogger
   ) {
+    // Trim API key to remove any trailing \r\n or spaces (common on Windows)
+    if (this.etherscanApiKey) {
+      this.etherscanApiKey = this.etherscanApiKey.trim()
+    }
+    this.log = logger || console
     this.incomingTokenWhitelist = new Set(
       incomingTokenWhitelist
         .map((address) => address.toLowerCase().trim())
@@ -522,6 +536,8 @@ export class WalletCore {
       const incoming = await this.getIncomingTransactions(address, limit)
       const incomingWithDir = incoming.map(tx => ({ ...tx, direction: 'in' as const }))
 
+      this.log.info('[WalletCore:getHistory] local:', localWithDir.length, '| incoming:', incomingWithDir.length)
+
       // 3. Merge + deduplicate
       const seen = new Set<string>()
       const merged: TransactionInfo[] = []
@@ -539,7 +555,7 @@ export class WalletCore {
 
       return merged.slice(0, limit)
     } catch (error) {
-      console.error('[WalletCore:getHistory] ERROR:', error)
+      this.log.error('[WalletCore:getHistory] ERROR:', error)
       return []
     }
   }
@@ -592,31 +608,58 @@ export class WalletCore {
    */
   async getIncomingTransactions(address: string, limit = 50): Promise<TransactionInfo[]> {
     if (!this.etherscanApiKey) {
-      console.warn('[WalletCore:getIncoming] ETHERSCAN_API_KEY is not set; incoming transactions disabled')
+      this.log.warn('[WalletCore:getIncoming] ETHERSCAN_API_KEY is not set; incoming transactions disabled')
       return []
     }
 
     try {
       const normalizedAddress = address.toLowerCase()
-      const baseUrl = 'https://api.etherscan.io/api?module=account&address=' + address + '&startblock=0&endblock=99999999&page=1&offset=' + limit + '&sort=desc&apikey=' + this.etherscanApiKey
 
-      const [ethResponse, erc20Response] = await Promise.all([
-        fetch(baseUrl + '&action=txlist'),
-        fetch(baseUrl + '&action=tokentx'),
+      // Build URLs with URLSearchParams for proper encoding
+      const commonParams = {
+        module: 'account',
+        address,
+        startblock: '0',
+        endblock: '99999999',
+        page: '1',
+        offset: String(limit),
+        sort: 'desc',
+        apikey: this.etherscanApiKey,
+      }
+
+      const ethUrl = 'https://api.etherscan.io/api?' + new URLSearchParams({ ...commonParams, action: 'txlist' }).toString()
+      const erc20Url = 'https://api.etherscan.io/api?' + new URLSearchParams({ ...commonParams, action: 'tokentx' }).toString()
+
+      this.log.info('[WalletCore:getIncoming] Fetching ETH:', ethUrl.replace(/apikey=[^&]+/, 'apikey=***'))
+      this.log.info('[WalletCore:getIncoming] Fetching ERC20:', erc20Url.replace(/apikey=[^&]+/, 'apikey=***'))
+
+      // Use Promise.allSettled so one failure doesn't kill both
+      const [ethResult, erc20Result] = await Promise.allSettled([
+        fetch(ethUrl).then(r => r.json()),
+        fetch(erc20Url).then(r => r.json()),
       ])
 
-      const [ethData, erc20Data] = await Promise.all([
-        ethResponse.json(),
-        erc20Response.json(),
-      ])
+      const ethData = ethResult.status === 'fulfilled' ? ethResult.value : null
+      const erc20Data = erc20Result.status === 'fulfilled' ? erc20Result.value : null
+
+      if (ethResult.status === 'rejected') {
+        this.log.error('[WalletCore:getIncoming] ETH fetch failed:', ethResult.reason)
+      }
+      if (erc20Result.status === 'rejected') {
+        this.log.error('[WalletCore:getIncoming] ERC20 fetch failed:', erc20Result.reason)
+      }
 
       // Validate Etherscan responses
       if (ethData?.status === '0' && ethData?.message !== 'No transactions found') {
-        console.error('[WalletCore:getIncoming] Etherscan txlist error:', ethData?.message, ethData?.result)
+        this.log.error('[WalletCore:getIncoming] Etherscan txlist error:', ethData?.message, ethData?.result)
       }
       if (erc20Data?.status === '0' && erc20Data?.message !== 'No transactions found') {
-        console.error('[WalletCore:getIncoming] Etherscan tokentx error:', erc20Data?.message, erc20Data?.result)
+        this.log.error('[WalletCore:getIncoming] Etherscan tokentx error:', erc20Data?.message, erc20Data?.result)
       }
+
+      // Log raw response shape for debugging
+      this.log.info('[WalletCore:getIncoming] ETH response status:', ethData?.status, 'message:', ethData?.message, 'resultCount:', Array.isArray(ethData?.result) ? ethData.result.length : 'NOT_ARRAY')
+      this.log.info('[WalletCore:getIncoming] ERC20 response status:', erc20Data?.status, 'message:', erc20Data?.message, 'resultCount:', Array.isArray(erc20Data?.result) ? erc20Data.result.length : 'NOT_ARRAY')
 
       const allEthTxs = Array.isArray(ethData?.result) ? ethData.result : []
       const ethToMe = allEthTxs.filter((tx: any) => tx.to?.toLowerCase() === normalizedAddress)
@@ -641,6 +684,8 @@ export class WalletCore {
         return tokenAddr && this.incomingTokenWhitelist.has(tokenAddr)
       })
 
+      this.log.info('[WalletCore:getIncoming] ethToMe:', ethToMe.length, '| erc20ToMe:', erc20ToMe.length, '| erc20Whitelisted:', erc20Whitelisted.length)
+
       const incomingErc20: TransactionInfo[] = erc20Whitelisted
           .map((tx: any): TransactionInfo => {
             const tokenDecimals = Number(tx.tokenDecimal || 18)
@@ -663,9 +708,11 @@ export class WalletCore {
             }
           })
 
-      return [...incomingEth, ...incomingErc20]
+      const result = [...incomingEth, ...incomingErc20]
+      this.log.info('[WalletCore:getIncoming] TOTAL incoming:', result.length, '(eth:', incomingEth.length, '+ erc20:', incomingErc20.length, ')')
+      return result
     } catch (error) {
-      console.error('[WalletCore:getIncoming] ERROR:', error)
+      this.log.error('[WalletCore:getIncoming] ERROR:', error)
       return []
     }
   }

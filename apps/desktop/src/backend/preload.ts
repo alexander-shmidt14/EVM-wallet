@@ -61,6 +61,7 @@ const electronAPI = {
 
   // Diagnostics (visible in renderer DevTools)
   getDiagnostics: () => ipcRenderer.invoke('wallet:getDiagnostics'),
+  testEtherscan: (address: string) => ipcRenderer.invoke('wallet:testEtherscan', address),
 }
 
 // Expose the API to the renderer process

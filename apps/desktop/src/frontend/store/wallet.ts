@@ -39,10 +39,21 @@ interface ElectronAPI {
   getDiagnostics: () => Promise<{
     etherscanKeyPresent: boolean
     etherscanKeyLength: number
+    etherscanKeyTrimmedLength: number
     rpcUrl: string
     whitelistCount: number
     whitelistAddresses: string[]
     logPath: string
+  }>
+  testEtherscan: (address: string) => Promise<{
+    ok: boolean
+    status?: string
+    message?: string
+    resultType?: string
+    resultCount?: number
+    firstResult?: { hash: string; from: string; to: string } | null
+    rawResult?: string
+    error?: string
   }>
 }
 
@@ -399,6 +410,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
           '[Diagnostics]',
           'keyPresent:', diag.etherscanKeyPresent,
           '| keyLen:', diag.etherscanKeyLength,
+          '| trimmedLen:', diag.etherscanKeyTrimmedLength,
           '| rpc:', diag.rpcUrl,
           '| wl:', diag.whitelistCount,
           '| addrs:', diag.whitelistAddresses,
@@ -409,6 +421,17 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         }
       } catch (diagErr) {
         console.warn('[Diagnostics] fetch failed:', diagErr)
+      }
+
+      // Test Etherscan API directly and log raw response to DevTools
+      try {
+        const ethTest = await window.electronAPI.testEtherscan(currentAddress)
+        console.log('[Etherscan Test]', JSON.stringify(ethTest, null, 2))
+        if (!ethTest.ok) {
+          console.error('[Etherscan Test] FAILED:', ethTest.error || ethTest.rawResult || ethTest.message)
+        }
+      } catch (testErr) {
+        console.warn('[Etherscan Test] call failed:', testErr)
       }
 
       const transactions = await window.electronAPI.getTransactionHistory(currentAddress, 50)
