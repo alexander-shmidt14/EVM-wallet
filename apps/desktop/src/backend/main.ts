@@ -1,9 +1,14 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { createHash } from 'crypto'
+import log from 'electron-log'
 import { WalletCore } from '@wallet/wallet-core'
 import { secureStore } from './secure-store'
 import { initAutoUpdater } from './auto-updater'
+
+// Configure electron-log for main process diagnostics
+log.transports.file.level = 'info'
+log.transports.console.level = 'info'
 
 // Keep a global reference of the window object
 let mainWindow: BrowserWindow | null = null
@@ -25,12 +30,10 @@ const initWalletCore = () => {
     .map((address) => address.trim())
     .filter(Boolean)
 
-  // ── DEBUG: incoming-transactions diagnostics ──
-  console.log('[InitWalletCore] RPC URL:', rpcUrl ? rpcUrl.replace(/\/v[23]\/.*/, '/v*/***') : '(empty, using publicnode)')
-  console.log('[InitWalletCore] ETHERSCAN_API_KEY present:', !!etherscanApiKey, '| length:', (etherscanApiKey || '').length)
-  console.log('[InitWalletCore] ETHERSCAN_API_KEY raw repr:', JSON.stringify(etherscanApiKey))
-  console.log('[InitWalletCore] INCOMING_ERC20_WHITELIST:', incomingTokenWhitelist.length > 0 ? incomingTokenWhitelist : '(empty, default MMA)')
-  // ── END DEBUG ──
+  // Log config to file (visible in %APPDATA%/EVM Wallet/logs/main.log)
+  log.info('[InitWalletCore] RPC URL:', rpcUrl ? rpcUrl.replace(/\/v[23]\/.*/, '/v*/***') : '(empty, using publicnode)')
+  log.info('[InitWalletCore] ETHERSCAN_API_KEY present:', !!etherscanApiKey, '| length:', (etherscanApiKey || '').length)
+  log.info('[InitWalletCore] INCOMING_ERC20_WHITELIST:', incomingTokenWhitelist.length > 0 ? incomingTokenWhitelist : '(empty, default MMA)')
 
   walletCore = new WalletCore(
     rpcUrl,
@@ -244,23 +247,12 @@ ipcMain.handle('wallet:getLocalTransactions', async (_, address?: string) => {
 
 ipcMain.handle('wallet:getIncomingTransactions', async (_, address: string, limit: number = 50) => {
   if (!walletCore) throw new Error('Wallet core not initialized')
-  console.log('[IPC:getIncomingTransactions] address:', address, '| limit:', limit)
-  const result = await walletCore.getIncomingTransactions(address, limit)
-  console.log('[IPC:getIncomingTransactions] result:', result.length, 'incoming txs')
-  return result
+  return walletCore.getIncomingTransactions(address, limit)
 })
 
 ipcMain.handle('wallet:getTransactionHistory', async (_, address: string, limit: number = 50) => {
   if (!walletCore) throw new Error('Wallet core not initialized')
-  console.log('[IPC:getTransactionHistory] address:', address, '| limit:', limit)
-  const result = await walletCore.getTransactionHistory(address, limit)
-  const inCount = result.filter((tx: any) => tx.direction === 'in').length
-  const outCount = result.filter((tx: any) => tx.direction === 'out').length
-  console.log('[IPC:getTransactionHistory] result:', result.length, 'total |', inCount, 'in |', outCount, 'out')
-  if (result.length > 0) {
-    console.log('[IPC:getTransactionHistory] first tx sample:', JSON.stringify(result[0], null, 2))
-  }
-  return result
+  return walletCore.getTransactionHistory(address, limit)
 })
 
 ipcMain.handle('wallet:getTransactionStatus', async (_, txHash: string) => {
@@ -276,4 +268,23 @@ ipcMain.handle('wallet:getSeedPhrase', async () => {
 ipcMain.handle('wallet:resetWallet', async () => {
   if (!walletCore) throw new Error('Wallet core not initialized')
   return walletCore.resetWallet()
+})
+
+// ── Diagnostics IPC (visible in renderer DevTools) ──────────────
+ipcMain.handle('wallet:getDiagnostics', async () => {
+  const etherscanApiKey = process.env.ETHERSCAN_API_KEY
+  const rpcUrl = process.env.ALCHEMY_RPC_MAINNET || process.env.INFURA_RPC_MAINNET || 'https://ethereum.publicnode.com'
+  const whitelist = (process.env.INCOMING_ERC20_WHITELIST || '')
+    .split(',')
+    .map((a: string) => a.trim())
+    .filter(Boolean)
+
+  return {
+    etherscanKeyPresent: !!etherscanApiKey,
+    etherscanKeyLength: (etherscanApiKey || '').length,
+    rpcUrl: rpcUrl ? rpcUrl.replace(/\/v[23]\/.*/, '/v*/***') : '(empty)',
+    whitelistCount: whitelist.length,
+    whitelistAddresses: whitelist.map((a: string) => a.slice(0, 10) + '...'),
+    logPath: log.transports.file.getFile()?.path || 'unknown',
+  }
 })

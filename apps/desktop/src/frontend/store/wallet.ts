@@ -36,6 +36,14 @@ interface ElectronAPI {
   getTransactionStatus: (txHash: string) => Promise<TransactionStatus>
   getSeedPhrase: () => Promise<string>
   resetWallet: () => Promise<void>
+  getDiagnostics: () => Promise<{
+    etherscanKeyPresent: boolean
+    etherscanKeyLength: number
+    rpcUrl: string
+    whitelistCount: number
+    whitelistAddresses: string[]
+    logPath: string
+  }>
 }
 
 declare global {
@@ -380,19 +388,35 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   loadTransactions: async () => {
     try {
       const { currentAddress } = get()
-      if (!currentAddress) {
-        console.log('[Store:loadTransactions] SKIP: no currentAddress')
-        return
+      if (!currentAddress) return
+
+      set({ isLoadingTransactions: true })
+
+      // Diagnostics: fetch main-process config and log to DevTools
+      try {
+        const diag = await window.electronAPI.getDiagnostics()
+        console.log(
+          '[Diagnostics]',
+          'keyPresent:', diag.etherscanKeyPresent,
+          '| keyLen:', diag.etherscanKeyLength,
+          '| rpc:', diag.rpcUrl,
+          '| wl:', diag.whitelistCount,
+          '| addrs:', diag.whitelistAddresses,
+          '| log:', diag.logPath,
+        )
+        if (!diag.etherscanKeyPresent) {
+          console.error('[Diagnostics] ETHERSCAN_API_KEY is EMPTY — incoming txs will not work')
+        }
+      } catch (diagErr) {
+        console.warn('[Diagnostics] fetch failed:', diagErr)
       }
 
-      console.log('[Store:loadTransactions] START | address:', currentAddress)
-      set({ isLoadingTransactions: true })
       const transactions = await window.electronAPI.getTransactionHistory(currentAddress, 50)
       const inCount = transactions.filter((tx: any) => tx.direction === 'in').length
       const outCount = transactions.filter((tx: any) => tx.direction === 'out').length
-      console.log('[Store:loadTransactions] DONE |', transactions.length, 'total |', inCount, 'in |', outCount, 'out')
-      if (inCount === 0) {
-        console.warn('[Store:loadTransactions] Zero incoming transactions - check main-proc logs for [WalletCore:getIncoming]')
+      console.log('[Store:loadTransactions]', transactions.length, 'total |', inCount, 'in |', outCount, 'out')
+      if (inCount === 0 && transactions.length > 0) {
+        console.warn('[Store:loadTransactions] Zero incoming -- see [Diagnostics] above')
       }
       set({ transactions, isLoadingTransactions: false })
     } catch (error) {
