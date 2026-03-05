@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { createHash } from 'crypto'
 import log from 'electron-log'
+import fetch from 'cross-fetch'
 import { WalletCore } from '@wallet/wallet-core'
 import { secureStore } from './secure-store'
 import { initAutoUpdater } from './auto-updater'
@@ -39,7 +40,8 @@ const initWalletCore = () => {
     rpcUrl,
     secureStore,
     etherscanApiKey,
-    incomingTokenWhitelist.length > 0 ? incomingTokenWhitelist : undefined
+    incomingTokenWhitelist.length > 0 ? incomingTokenWhitelist : undefined,
+    log
   )
 }
 
@@ -282,9 +284,52 @@ ipcMain.handle('wallet:getDiagnostics', async () => {
   return {
     etherscanKeyPresent: !!etherscanApiKey,
     etherscanKeyLength: (etherscanApiKey || '').length,
+    etherscanKeyTrimmedLength: (etherscanApiKey || '').trim().length,
     rpcUrl: rpcUrl ? rpcUrl.replace(/\/v[23]\/.*/, '/v*/***') : '(empty)',
     whitelistCount: whitelist.length,
     whitelistAddresses: whitelist.map((a: string) => a.slice(0, 10) + '...'),
     logPath: log.transports.file.getFile()?.path || 'unknown',
+  }
+})
+
+// ── Etherscan test IPC (single API call to verify key works) ────
+ipcMain.handle('wallet:testEtherscan', async (_, address: string) => {
+  const apiKey = (process.env.ETHERSCAN_API_KEY || '').trim()
+  if (!apiKey) {
+    return { ok: false, error: 'ETHERSCAN_API_KEY is empty' }
+  }
+  try {
+    const params = new URLSearchParams({
+      module: 'account',
+      action: 'txlist',
+      address,
+      startblock: '0',
+      endblock: '99999999',
+      page: '1',
+      offset: '3',
+      sort: 'desc',
+      apikey: apiKey,
+    })
+    const url = 'https://api.etherscan.io/api?' + params.toString()
+    log.info('[testEtherscan] URL:', url.replace(/apikey=[^&]+/, 'apikey=***'))
+
+    const resp = await fetch(url)
+    const data = await resp.json()
+    log.info('[testEtherscan] Response:', JSON.stringify(data).slice(0, 500))
+
+    return {
+      ok: data?.status === '1',
+      status: data?.status,
+      message: data?.message,
+      resultType: Array.isArray(data?.result) ? 'array' : typeof data?.result,
+      resultCount: Array.isArray(data?.result) ? data.result.length : 0,
+      firstResult: Array.isArray(data?.result) && data.result.length > 0
+        ? { hash: data.result[0].hash, from: data.result[0].from, to: data.result[0].to }
+        : null,
+      rawResult: typeof data?.result === 'string' ? data.result : undefined,
+    }
+  } catch (err: any) {
+    log.error('[testEtherscan] ERROR:', err)
+    return { ok: false, error: String(err?.message || err) }
   }
 })
